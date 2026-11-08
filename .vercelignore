@@ -1,0 +1,5 @@
+# Only what build.mjs needs: index.html, src/, assets/ (precompiled records), records/ (their audio).
+dist
+test
+songs
+lathe.mjs
