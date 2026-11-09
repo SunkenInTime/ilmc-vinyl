@@ -4,7 +4,7 @@
 // `cut` is passed to the lathe (src/cut.js) for that record.
 const commons = (file) => 'https://commons.wikimedia.org/wiki/File:' + file;
 
-export const RECORDS = [
+const ALL = [
   { id: 'house', title: 'Demo EP', by: 'synthesised', credit: 'Synthesised by this page, with a test band' },
   {
     id: 'summer-air', title: 'Summer Air', by: 'HoliznaCC0', credit: 'HoliznaCC0', licence: 'CC0',
@@ -71,3 +71,8 @@ export const RECORDS = [
     tracks: [{ file: 'summer-presto.mp3', title: 'Summer: Presto' }],
   },
 ];
+
+// Published on Cloudflare, where one file may be at most 25 MiB: the records whose cut is bigger stay out of the
+// public shelf (their audio is still in records/ for anyone running it locally with `npm run lathe`).
+const TOO_BIG = new Set(['rhapsody', 'moonlight', 'summer-air', 'toccata', '1812']);
+export const RECORDS = ALL.filter((r) => !TOO_BIG.has(r.id));

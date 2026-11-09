@@ -3,24 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Record Player</title>
-<meta name="description" content="A physical simulation of how a record player makes sound: the music is cut into a groove and a simulated stylus reads it back.">
-<meta property="og:title" content="Record Player">
-<meta property="og:description" content="A physical simulation of how a record player makes sound. The music is cut into a groove and a simulated stylus reads it back.">
-<meta property="og:image" content="https://vinyl-gl.vercel.app/og.png">
+<title>I Love My Computer</title>
+<meta name="description" content="A fan remix of a record player simulated from the groove up, for Ninajirachi's I Love My Computer. Bring your own copy of Fuck My Computer: it is cut into a groove in your browser and a simulated stylus plays it back.">
+<meta property="og:title" content="I Love My Computer">
+<meta property="og:description" content="Bring your own copy of Fuck My Computer. It is cut into a groove in your browser, a simulated stylus plays it back, and a room of old computers loses its mind.">
+<meta property="og:image" content="https://ilmc.daracloud.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:url" content="https://vinyl-gl.vercel.app/">
+<meta property="og:url" content="https://ilmc.daracloud.uk/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:creator" content="@rauchg">
-<meta name="twitter:image" content="https://vinyl-gl.vercel.app/og.png">
+<meta name="twitter:image" content="https://ilmc.daracloud.uk/og.png">
 <script>
 // Start downloading and decoding the opening record now, before any module has even been requested.
 (function () {
   // phones get a short record first: a long side needs several hundred MB of memory once decoded
   var small = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
-  var id = small ? 'gymnopedie' : 'rhapsody', dir = 'assets/' + id + '/', b = window.__boot = { id: id, dir: dir, got: 0, total: 0 };
+  var id = 'mountain-king', dir = 'assets/' + id + '/', b = window.__boot = { id: id, dir: dir, got: 0, total: 0 };
   b.man = fetch(dir + 'record.json').then(function (r) { if (!r.ok) throw new Error('no precompiled record'); return r.json(); });
   b.vis = fetch(dir + 'record.vis').then(function (r) { if (!r.ok) throw new Error('no precompiled record'); return r.arrayBuffer(); });
   b.audio = fetch(dir + 'record.flac').then(function (r) {
@@ -53,12 +52,15 @@
   })();
 })();
 </script>
+<script type="importmap">{ "imports": { "three": "./src/vendor/three.module.min.js" } }</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@500;700&family=Pinyon+Script&family=Anton&family=Bodoni+Moda:ital,wght@0,400;1,700&family=Orbitron:wght@700;900&family=UnifrakturCook:wght@700&family=VT323&display=swap" rel="stylesheet">
 <link rel="modulepreload" href="src/main.js"><link rel="modulepreload" href="src/render.js"><link rel="modulepreload" href="src/gl-util.js">
 <link rel="modulepreload" href="src/shaders.js"><link rel="modulepreload" href="src/dsp.js"><link rel="modulepreload" href="src/geometry.js">
 <link rel="modulepreload" href="src/records.js"><link rel="modulepreload" href="src/label.js"><link rel="modulepreload" href="src/press.js">
 <link rel="modulepreload" href="src/worklet.js"><link rel="modulepreload" href="src/engine.js"><link rel="modulepreload" href="src/engine-core.js"><link rel="modulepreload" href="src/groove.js">
 <style>
-  :root { --fg: #e8e4dd; --soft: #c4c0b9; --dim: #85817a; --line: rgba(255,255,255,.1); --panel: rgba(12,12,13,.78); --acc: #ffb454; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  :root { --fg: #e8e4dd; --soft: #c4c0b9; --dim: #85817a; --line: rgba(255,255,255,.1); --panel: rgba(12,12,13,.78); --acc: #ffe10a; --cap0: #0a246a; --cap1: #a6caf0; --sys: 'Courier New', Courier, monospace; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #030304; color: var(--fg); font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; }
   #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; opacity: 0; transition: opacity .55s ease-out; }
@@ -75,9 +77,16 @@
   .og, .og body { background: #000; }
   .og body > :not(#gl) { display: none !important; }      /* ?og: only the render, for the share image */
   #vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 46%, transparent 42%, rgba(0,0,0,.6) 100%); }
+  #words { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+  /* I Love My Computer: the logo is the face from the Fuck My Computer video */
+  #logo { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  #logo svg { width: 46px; height: 46px; flex: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)) drop-shadow(0 0 14px rgba(160,200,255,.18)); }
+  #logo b { display: block; font: 900 19px/1 Orbitron, 'Arial Black', sans-serif; letter-spacing: .04em; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,.55), 0 0 2px #fff; }
+  #logo span { display: block; margin-top: 4px; font: italic 700 13px/1 'Times New Roman', Times, serif; color: #ffe10a; letter-spacing: .02em; text-shadow: 0 0 1px #000, 0 1px 2px #000; }
+  .og #words, .plain #words { display: none; }
 
   #teaser { position: fixed; top: 16px; left: 18px; max-width: 290px; z-index: 6; }
-  #teaser p { margin: 0; color: var(--dim); }
+  #teaser p { margin: 0; color: var(--dim); max-width: 270px; }
   .link { all: unset; cursor: pointer; color: var(--fg); border-bottom: 1px solid rgba(255,255,255,.3); }
   .link:hover { border-color: var(--fg); }
   #toggles { position: fixed; top: 12px; right: 14px; display: flex; gap: 2px; z-index: 6; }
@@ -86,6 +95,8 @@
   #toggles button[hidden] { display: none; }
   #credit { position: fixed; right: 24px; bottom: 13px; z-index: 6; display: flex; gap: 20px; align-items: baseline; color: var(--dim); }   /* same size and spacing as the top-right labels */
   #credit a { color: inherit; text-decoration: none; }
+  #credit .remix em { font: italic 12.5px 'Times New Roman', Times, serif; color: var(--soft); letter-spacing: .01em; }
+  #credit .remix a { color: var(--fg); }
   #credit a:hover, #t-reset:hover { color: var(--fg); }
   #t-reset { all: unset; cursor: pointer; }
   #t-reset[hidden] { display: none; }
@@ -108,7 +119,12 @@
 
   .panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(16px); padding: 14px; z-index: 4; }
   #ctl { top: 46px; right: 14px; width: 236px; max-height: calc(100% - 86px); overflow: auto; }
-  #hud { left: 16px; bottom: 40px; width: 292px; padding: 10px; opacity: 0; pointer-events: none; transition: opacity .5s; }
+  #hud { left: 16px; bottom: 40px; width: 292px; padding: 0 0 9px; opacity: 0; pointer-events: none; transition: opacity .5s; border-radius: 3px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.14); box-shadow: inset 1px 1px 0 rgba(255,255,255,.08), 0 6px 24px rgba(0,0,0,.45); }
+  #hud .cap { display: flex; align-items: center; justify-content: space-between; height: 17px; padding: 0 3px 0 7px; margin-bottom: 8px;
+    background: linear-gradient(90deg, rgba(10,36,106,.92), rgba(166,202,240,.55)); color: #fff; font: bold 10.5px/17px var(--sys); letter-spacing: .02em; }
+  #hud .cap i { width: 11px; height: 11px; border: 1px solid rgba(255,255,255,.55); border-radius: 1px; display: grid; place-items: center; font: 9px/1 Arial, sans-serif; font-style: normal; color: rgba(255,255,255,.8); }
+  #hud > :not(.cap) { margin-left: 9px; margin-right: 9px; }
   #hud.on { opacity: 1; }   /* only while the needle is on the record */
   h2 { font-size: 10px; margin: 14px 0 6px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; font-weight: 500; }
   h2:first-child { margin-top: 0; }
@@ -126,19 +142,61 @@
   #shelf button[aria-current=true] b { color: var(--acc); }
   #shelf p { margin: 8px 8px 4px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--dim); font-size: 11px; }
   #shelf a { color: var(--soft); }
-  #scope { width: 100%; height: 62px; display: block; border-radius: 6px; }
-  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 12px; margin-top: 8px; font: 10px/1.4 var(--mono); }
+  #scope { width: calc(100% - 18px); height: 62px; display: block; border-radius: 1px; box-shadow: inset 1px 1px 0 rgba(0,0,0,.6), inset -1px -1px 0 rgba(255,255,255,.07); }
+  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 12px; margin-top: 8px; font: 10.5px/1.45 var(--sys); }
   #stats span { color: var(--dim); } #stats b { font-weight: 400; float: right; color: var(--soft); }
 
   /* only the pill takes clicks: the scene under the overlay can be dragged and zoomed, and tapping it also powers on */
   #power { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.28); z-index: 5; opacity: 0; pointer-events: none; transition: opacity .4s ease-out .25s; }
   .ready #power { opacity: 1; }
-  .ready #power span { pointer-events: auto; cursor: pointer; }
-  .ready #power.busy span { cursor: progress; }
-  #power.busy span::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: -1px; border: 1.5px solid rgba(255,255,255,.22); border-top-color: var(--fg); border-radius: 50%; animation: spin .8s linear infinite; }
+  .ready #power-msg { pointer-events: auto; cursor: pointer; }
+  .ready #power.busy #power-msg { cursor: progress; }
+  #power.busy #power-msg::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: -1px; border: 1.5px solid rgba(255,255,255,.22); border-top-color: var(--fg); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #power span { padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); backdrop-filter: blur(10px); letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
+  #power-msg { display: none; padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); backdrop-filter: blur(10px); letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
 
+  /* windows: a quiet Windows 2000 title bar on the dark glass panels */
+  .cap { display: flex; align-items: center; justify-content: space-between; height: 17px; padding: 0 3px 0 7px;
+    background: linear-gradient(90deg, rgba(10,36,106,.92), rgba(166,202,240,.55)); color: #fff; font: bold 10.5px/17px var(--sys); letter-spacing: .02em; user-select: none; }
+  .cap i { width: 11px; height: 11px; border: 1px solid rgba(255,255,255,.55); border-radius: 1px; display: grid; place-items: center; font: 9px/1 Arial, sans-serif; font-style: normal; color: rgba(255,255,255,.8); }
+  .cap button { all: unset; cursor: pointer; width: 11px; height: 11px; border: 1px solid rgba(255,255,255,.55); border-radius: 1px; display: grid; place-items: center; font: 9px/1 Arial, sans-serif; color: rgba(255,255,255,.8); }
+  .cap button:hover { background: rgba(255,255,255,.15); }
+  #ctl > .cap { margin: -14px -14px 12px; } #shelf > .cap { margin: -8px -8px 6px; }
+  #ctl, #shelf { border-radius: 3px; }
+  /* the insert-disc window */
+  #insert { width: min(392px, calc(100vw - 32px)); background: rgba(13,15,22,.9); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.14); border-radius: 3px;
+    box-shadow: inset 1px 1px 0 rgba(255,255,255,.08), 0 18px 60px rgba(0,0,0,.55); opacity: 0; transform: translateY(6px) scale(.985); transition: opacity .35s .2s, transform .35s .2s; }
+  .ready #insert { opacity: 1; transform: none; pointer-events: auto; }
+  #power.busy #insert { display: none; }
+  #insert .body { display: flex; gap: 16px; align-items: flex-start; padding: 18px 18px 6px; }
+  #insert .txt { flex: 1; min-width: 0; }
+  #insert p { margin: 0 0 10px; color: var(--soft); font-size: 12.5px; line-height: 1.5; }
+  #insert p b { color: var(--fg); font-weight: 600; } #insert p i { font-family: 'Times New Roman', Times, serif; font-size: 14px; color: var(--fg); }
+  #insert .fine { color: var(--dim); font-size: 11.5px; }
+  #insert .err { color: #ff8a7a; }
+  #insert .btns { display: flex; gap: 8px; padding: 4px 18px 0; }
+  #insert .btns > * { all: unset; box-sizing: border-box; flex: 1; text-align: center; cursor: pointer; padding: 8px 10px; border-radius: 2px; font: 12px/1.2 system-ui, sans-serif;
+    color: var(--fg); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); }
+  #insert .btns > *:hover { background: rgba(255,255,255,.12); }
+  #insert .btns > .def { background: #ecebe5; color: #111; border-color: #fff; box-shadow: 0 0 0 1px #000 inset; font-weight: 600; }
+  #insert .btns > .def:hover { background: #fff; }
+  #insert .fmt { margin: 12px 18px 0; font: 10px/1.4 var(--sys); color: var(--dim); letter-spacing: .03em; }
+  #insert .alt { margin: 6px 18px 14px; }
+  #insert .alt .link { color: var(--dim); border-color: rgba(255,255,255,.15); font-size: 11.5px; }
+  #insert [data-show] { display: none; }
+  #insert[data-state=idle] [data-show~=idle], #insert[data-state=error] [data-show~=error], #insert[data-state=cutting] [data-show~=cutting], #insert[data-state=ready] [data-show~=ready] { display: block; }
+  #insert[data-state=idle] .btns[data-show~=idle], #insert[data-state=error] .btns[data-show~=error], #insert[data-state=ready] .btns[data-show~=ready] { display: flex; }
+  /* a CD, spinning while it is being cut */
+  #insert .cd { flex: none; width: 58px; height: 58px; border-radius: 50%; margin-top: 2px;
+    background: radial-gradient(circle, #0d0f16 0 5px, #d9dbe2 6px 9px, transparent 10px), conic-gradient(from 20deg, #cfd6e6, #f3d9ef, #cdeff3, #f2efc9, #d9cff3, #cfd6e6);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 2px 10px rgba(0,0,0,.5); }
+  #insert[data-state=cutting] .cd { animation: spin .7s linear infinite; }
+  #insert[data-state=ready] .cd { animation: spin 3.6s linear infinite; }
+  /* dragging a file over the page */
+  #drop { position: fixed; inset: 10px; z-index: 9; border: 2px dashed rgba(255,225,10,.7); border-radius: 6px; background: rgba(8,9,14,.55); display: none; place-items: center; pointer-events: none;
+    font: bold 13px var(--sys); color: var(--acc); letter-spacing: .06em; }
+  .dragging #drop { display: grid; }
+  #shelf .insert { color: var(--acc); }
   dialog { background: rgba(15,15,16,.97); color: var(--fg); border: 1px solid var(--line); border-radius: 14px; padding: 28px 30px 22px; max-width: 540px; width: calc(100% - 40px); max-height: calc(100% - 40px); overflow: auto; font-size: 13px; line-height: 1.58; }
   dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(3px); }
   dialog h3 { font-size: 18px; margin: 0 0 14px; font-weight: 600; letter-spacing: -.01em; }
@@ -174,32 +232,44 @@
 <body>
 <canvas id="gl"></canvas>
 <div id="vig"></div>
+<div id="drop">drop it in the drive</div>
+<canvas id="words"></canvas>
 <div id="loader" class="wait"><div class="bar"><i id="loader-fill"></i></div><span id="loader-pct"></span></div>
 
 <header id="teaser">
-  <p>A physical simulation of how a record player makes sound. <button class="link" id="b-more">More</button></p>
+  <div id="logo" aria-label="Ninajirachi, I Love My Computer">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="chrome" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".34" stop-color="#d8dce6"/><stop offset=".44" stop-color="#6c707b"/><stop offset=".58" stop-color="#c9cdd7"/><stop offset="1" stop-color="#5a5e68"/></linearGradient></defs>
+      <path d="M14 18 Q4 18 9 27 L44 86 Q50 95 56 86 L91 27 Q96 18 86 18 Z" fill="url(#chrome)" stroke="rgba(255,255,255,.75)" stroke-width="2"/>
+      <rect x="30" y="30" width="9" height="16" rx="2.5" fill="#121318"/><rect x="61" y="30" width="9" height="16" rx="2.5" fill="#121318"/>
+      <path d="M38 56 a6 6 0 0 0 12 0 a6 6 0 0 0 12 0" fill="none" stroke="#121318" stroke-width="3.6" stroke-linecap="round"/></svg>
+    <div><b>NINAJIRACHI</b><span>I LOVE MY COMPUTER</span></div>
+  </div>
+  <p>A record player simulated from the groove up, remixed for Ninajirachi's <i style="font-family:'Times New Roman',serif">I Love My Computer</i>. <button class="link" id="b-more">About</button></p>
 </header>
 
 <nav id="toggles">
   <button id="t-records" aria-pressed="false" title="Records"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="now-title">Records</span><span id="now-time"></span></button>
+  <button id="t-flash" aria-pressed="true" title="Flashing lights">Flashing on</button>
   <button id="t-ctl" aria-pressed="false">Controls</button>
 </nav>
 
-<div id="credit"><button id="t-reset" hidden>Reset view</button><a href="https://x.com/rauchg" target="_blank" rel="noopener">@rauchg</a><a href="https://github.com/rauchg/vinyl" target="_blank" rel="noopener">Source</a></div>
+<div id="credit"><button id="t-reset" hidden>Reset view</button><span class="remix"><a href="https://x.com/rauchg" target="_blank" rel="noopener">@rauchg</a> <em>(I Love My Computer remix)</em></span><a href="https://github.com/SunkenInTime/ilmc-vinyl" target="_blank" rel="noopener">source</a></div>
 <div id="foot"><span id="status"></span></div>
 
 <section id="hud" class="panel">
+  <div class="cap" aria-hidden="true"><span>groove.exe</span><i>×</i></div>
   <canvas id="scope" width="540" height="124" title="The groove walls passing under the stylus"></canvas>
   <div id="stats">
     <div><span>speed</span><b id="s-rpm">-</b></div><div><span>groove</span><b id="s-vg">-</b></div>
-    <div><span>radius</span><b id="s-r">-</b></div><div><span>tracking error</span><b id="s-err">-</b></div>
+    <div><span>radius</span><b id="s-r">-</b></div><div><span>tracking err</span><b id="s-err">-</b></div>
     <div><span>left wall</span><b id="s-nl">-</b></div><div><span>right wall</span><b id="s-nr">-</b></div>
-    <div><span>mistracking</span><b id="s-loss">-</b></div><div><span>stylus height</span><b id="s-z">-</b></div>
+    <div><span>mistracking</span><b id="s-loss">-</b></div><div><span>stylus ht</span><b id="s-z">-</b></div>
     <div><span>cantilever</span><b id="s-xi">-</b></div><div><span>DSP load</span><b id="s-load">-</b></div>
   </div>
 </section>
 
 <section id="ctl" class="panel" hidden>
+  <div class="cap"><span>controls.exe</span><button data-close="t-ctl" aria-label="Close">×</button></div>
   <div class="row"><button id="b-start">Start</button><button id="b-cue">Cue</button></div>
   <div class="row"><button data-rpm="33.3333" class="on">33</button><button data-rpm="45">45</button><button data-rpm="78.26">78</button></div>
   <div class="row"><label>Volume</label><input id="p-volume" type="range" min="0" max="1" step="0.01" value="1"><output></output></div>
@@ -216,33 +286,41 @@
   <div class="row"><label>Scratches</label><input id="c-scratches" type="range" min="0" max="2" step="0.05" value="0.2"><output></output></div>
   <div class="row"><label>Warp mm</label><input id="c-warp" type="range" min="0" max="2" step="0.05" value="0.3"><output></output></div>
   <div class="row"><label>Off-centre</label><input id="c-offCenter" type="range" min="0" max="1.5" step="0.05" value="0.15"><output></output></div>
-  <div class="row"><button id="b-press">Press again</button><label class="file" for="f-audio">Cut a file</label><input id="f-audio" type="file" accept="audio/*" multiple hidden></div>
-  <div class="row"><button id="b-bump">Knock the table</button></div>
+  <div class="row"><button id="b-press">Press again</button><label class="file" for="f-audio">Cut a file</label><input id="f-audio" type="file" accept="audio/*,.mp3,.flac,.wav,.m4a,.aac,.alac,.ogg,.oga,.opus,.aif,.aiff,.webm" multiple hidden></div>
+  <div class="row"><button id="b-bump">Knock the table</button><button id="b-sfx">Sounds on</button></div>
 </section>
 
-<section id="shelf" class="panel" hidden></section>
+<section id="shelf" class="panel" hidden><div class="cap"><span>records.exe</span><button data-close="t-records" aria-label="Close">×</button></div></section>
 
 <dialog id="more">
-  <h3>A record player simulated "from the groove up"</h3>
-  <p>Instead of playing an audio file, the music is cut into a spiral groove, and a simulated stylus, cantilever, tonearm and cartridge read it back. What you hear is the voltage that motion would induce in the cartridge, after phono equalisation.</p>
-  <p>This is a <em>physical simulation</em> of a record player's mechanics, which happen to play sound. It works in four steps, each a small file in <a href="https://github.com/rauchg/vinyl/tree/main/src" target="_blank" rel="noopener"><code>src/</code></a>.</p>
-  <p><strong>1. Cut.</strong> The lathe (<a href="https://github.com/rauchg/vinyl/blob/main/src/cut.js" target="_blank" rel="noopener"><code>cut.js</code></a>) turns the audio into the two walls of a stereo groove at 33⅓ rpm, <span id="d-points">millions of</span> points on each: RIAA pre-emphasis, a limiter so a real cutter could have cut it, and variable pitch so the side fits on a 12" disc. The records on the shelf are cut ahead of time. Files you bring are cut here, in a worker. From then on the only thing that exists is the disc.</p>
-  <p><strong>2. Press.</strong> The pressing plant (<a href="https://github.com/rauchg/vinyl/blob/main/src/press.js" target="_blank" rel="noopener"><code>press.js</code></a>) changes the geometry itself: wall roughness, dust, scratches, warp, an off-centre hole, groove echo. Nothing in it is an audio effect. It is seeded, so the same record always presses the same way.</p>
-  <p><strong>3. Play.</strong> The engine (<a href="https://github.com/rauchg/vinyl/blob/main/src/engine-core.js" target="_blank" rel="noopener"><code>engine-core.js</code></a>, <a href="https://github.com/rauchg/vinyl/blob/main/src/groove.js" target="_blank" rel="noopener"><code>groove.js</code></a>) runs on the audio thread. It moves a stylus tip weighing a third of a milligram, on a springy cantilever at the end of a pivoting arm, against both walls <span id="d-rate">hundreds of thousands of</span> times a second, and turns that motion into the voltage of a moving-magnet cartridge.</p>
-  <p><strong>4. Draw.</strong> The deck (<a href="https://github.com/rauchg/vinyl/blob/main/src/render.js" target="_blank" rel="noopener"><code>render.js</code></a>) is WebGL2, and the disc is drawn from the cut itself: the actual spiral, lit by how hard each revolution is modulated. The small view in the corner is the real groove wall passing under the stylus.</p>
-  <p><strong>"Real", procedural flaws.</strong></p>
-  <ul>
-    <li>Hiss and crackle are roughness and dust on the walls. A scratch ticks once per turn because the needle crosses it once per turn.</li>
-    <li>Treble dulls toward the label: the groove moves slower there and the tip no longer fits the wiggles.</li>
-    <li>Pitch wavers when the hole is off-centre, and bends when the platter starts or stops, because the platter has inertia.</li>
-    <li>With too little tracking force the needle leaves the wall. Knock the table and it skips.</li>
-  </ul>
-  <p>Drop the needle anywhere, or drag the record to scratch it. Drag empty space to look around and scroll to zoom in on the stylus. In Controls you can change the stylus, lower the tracking force, press a dirtier copy, or cut your own audio.</p>
-  <p class="fine">Set by hand rather than derived: how rough the walls are, and how much the bearing rumbles and the motor flutters. Not simulated: stylus rake angle and record wear.</p>
+  <h3>I Love My Computer, on a simulated record player</h3>
+  <p>A fan remix of Guillermo Rauch's <a href="https://github.com/rauchg/vinyl" target="_blank" rel="noopener">vinyl</a>, a record player simulated from the groove up, rebuilt as a love letter to Ninajirachi's album <a href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener">I Love My Computer</a>.</p>
+  <p><strong>Bring your own copy.</strong> No music from the album comes with this page. When you insert your copy of <em>Fuck My Computer</em>, your browser cuts it into a spiral groove and a simulated stylus reads it back. The file never leaves your computer. If the page recognises the song, the room around the deck plays along: her lyrics, her vocal chops, the build-ups and the drops. Any other song works too, and the room follows its kicks.</p>
+  <p><strong>The deck.</strong> Nothing here is an audio player. The lathe turns the music into the two walls of a stereo groove, <span id="d-points">millions of</span> points each. The pressing plant adds dust, scratches and warp to that geometry. The engine moves a simulated stylus against both walls <span id="d-rate">hundreds of thousands of</span> times a second, and what you hear is the voltage a moving-magnet cartridge would make. Drop the needle anywhere, drag the record to scratch it, scroll to zoom in on the stylus.</p>
+  <p><strong>Credits.</strong> Music, lyrics and the :3 face: Ninajirachi. Deck, groove and physics: Guillermo Rauch (MIT). The room: Dara Adedeji. Records on the shelf are public domain or freely licensed; each one is credited on the shelf. Built with three.js.</p>
+  <p class="fine">An unofficial fan project, not affiliated with Ninajirachi or her label. <a href="https://github.com/SunkenInTime/ilmc-vinyl" target="_blank" rel="noopener">Source on GitHub</a>.</p>
   <form method="dialog"><button>Close</button></form>
 </dialog>
 
-<div id="power"><span id="power-msg">click to power on</span></div>
+<div id="power">
+  <div id="insert" data-state="idle" role="dialog" aria-labelledby="insert-t">
+    <div class="cap"><span id="insert-t">Insert disc</span><i aria-hidden="true">×</i></div>
+    <div class="body">
+      <div class="cd" aria-hidden="true"></div>
+      <div class="txt">
+        <p data-show="idle error">Bring your own copy of <i>Fuck My Computer</i> by Ninajirachi. The deck cuts it into a groove right here in your browser; the file never leaves your computer.</p>
+        <p data-show="error" class="err" id="insert-err"></p>
+        <p data-show="cutting"><b>Cutting the groove</b><br><span class="fine" id="insert-status">Reading the file</span></p>
+        <p data-show="ready"><b id="insert-title"></b><br><span class="fine" id="insert-note"></span></p>
+      </div>
+    </div>
+    <div class="btns" data-show="idle error"><button id="b-insert" class="def">Choose a file</button><a href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener">Buy it on Bandcamp</a></div>
+    <div class="btns" data-show="ready"><button id="b-play" class="def">Drop the needle</button><button id="b-other">Choose another</button></div>
+    <p class="fmt" data-show="idle error">MP3 · FLAC · WAV · M4A · OGG · OPUS<br>or drop the file anywhere on the page</p>
+    <p class="alt" data-show="idle error"><button class="link" id="b-demo">or play a public-domain record instead</button></p>
+  </div>
+  <span id="power-msg"></span>
+</div>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

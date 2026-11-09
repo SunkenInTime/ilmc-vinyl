@@ -12,8 +12,12 @@ const COMMON = `#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
 uniform sampler2DShadow uShadow; uniform mat4 uLVP; uniform vec3 uEye; uniform vec4 uLamp;   // lamp: xyz, on
+// ILMC: the screens around the deck. uSL: position (xyz) and size (w) of each glowing screen, uSC: its light; uAmb: room flash
+uniform vec4 uSL[8]; uniform vec3 uSC[8]; uniform vec3 uAmb;
 const vec3 L1 = ${v3(KEY)}, L2 = ${v3(FILL)}, L3 = ${v3(RIM)}, LS = ${v3(STRIP)};
-const vec3 KEYC = vec3(2.5, 2.38, 2.2), RIMC = vec3(0.55, 0.62, 0.75), FILLC = vec3(0.05, 0.05, 0.06);
+uniform float uKeyK;
+const vec3 KEYC0 = vec3(2.5, 2.38, 2.2), RIMC = vec3(0.55, 0.62, 0.75), FILLC = vec3(0.05, 0.05, 0.06);
+#define KEYC (KEYC0 * uKeyK)
 float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float softbox(vec3 r, vec3 d, vec3 u, vec2 half_, float s) {
   float t = dot(r, d); if (t <= 0.02) return 0.0;
@@ -27,6 +31,16 @@ vec3 env(vec3 r, float rough) {                      // what a reflection sees: 
   c += 7.0 * k * softbox(r, L1, vec3(1.0, 0.0, 0.0), vec2(0.55, 0.30), s) * vec3(1.0, 0.95, 0.88);
   c += 3.0 * k * softbox(r, LS, vec3(0.0, 1.0, 0.0), vec2(0.60, 0.07), s) * vec3(0.80, 0.88, 1.0);
   c += 4.0 * k * softbox(r, L3, vec3(0.0, 0.0, 1.0), vec2(0.34, 0.10), s) * vec3(0.85, 0.92, 1.0);
+  return c + uAmb * 0.35;
+}
+vec3 screensSeen(vec3 P, vec3 r, float rough) {      // reflections of the glowing screens (spheres of light, blurred by roughness)
+  vec3 c = vec3(0.0);
+  for (int i = 0; i < 8; i++) {
+    if (uSL[i].w <= 0.0) continue;
+    vec3 d = uSL[i].xyz - P; float l = length(d);
+    float ang = uSL[i].w / l, cosv = dot(r, d / l), w = ang + 0.6 * rough * rough + 0.01;
+    c += uSC[i] * smoothstep(cos(w), cos(w * 0.35), cosv) * (1.0 / (1.0 + 20.0 * rough));
+  }
   return c;
 }
 float shadow(vec3 P, vec3 N) {
@@ -36,6 +50,13 @@ float shadow(vec3 P, vec3 N) {
   for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) a += texture(uShadow, vec3(s.xy + vec2(float(i), float(j)) * t, s.z - 0.0009));
   return a / 9.0;
 }
+float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float vn3(vec3 x) {
+  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+float crust(vec3 p) { return vn3(p) * 0.65 + vn3(p * 2.3 + 5.0) * 0.35; }
 float pool(vec3 P) { return mix(0.05, 1.0, smoothstep(0.95, 0.20, length(P.xy - vec2(0.04, 0.0)))); }   // the key is a spot
 vec3 brdf(vec3 N, vec3 V, vec3 L, vec3 F0, vec3 diff, float rough) {
   float nl = max(dot(N, L), 0.0); if (nl <= 0.0) return vec3(0.0);
@@ -50,8 +71,14 @@ vec3 shade(vec3 P, vec3 N, vec3 alb, float rough, float metal, float ao) {
   vec3 c = brdf(N, V, L1, F0, diff, rough) * KEYC * sh * pool(P) + brdf(N, V, L3, F0, diff, rough) * RIMC * ao + brdf(N, V, L2, F0, diff, rough) * FILLC;
   vec3 lp = uLamp.xyz - P; float ld = length(lp);
   c += brdf(N, V, lp / ld, F0, diff, max(rough, 0.3)) * vec3(1.0, 0.10, 0.04) * uLamp.w * 1.6 / (1.0 + ld * ld / 0.0012);
+  for (int i = 0; i < 8; i++) {                      // screen light: diffuse + a soft highlight
+    if (uSL[i].w <= 0.0) continue;
+    vec3 sp = uSL[i].xyz - P; float sd = length(sp);
+    c += brdf(N, V, sp / sd, F0, diff, max(rough, 0.25)) * uSC[i] * (uSL[i].w * uSL[i].w * 6.0) / (sd * sd + 0.01);
+  }
+  c += diff * uAmb * ao;
   vec3 F = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - nv, 5.0);
-  return c + env(reflect(-V, N), rough) * F * ao * (0.45 + 0.55 * sh) + diff * 0.015 * ao;
+  return c + (env(reflect(-V, N), rough) + screensSeen(P, reflect(-V, N), rough)) * F * ao * (0.45 + 0.55 * sh) + diff * 0.015 * ao;
 }
 vec3 tone(vec3 x) {
   x = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
@@ -88,6 +115,16 @@ void main() {
   if (uMode == 2 && N.z > 0.5) {                        // deck plate: paint texture + contact occlusion
     alb *= 0.88 + 0.24 * hash(floor(vP.xy * 2500.0)) * (1.0 - smoothstep(2e-4, 1e-3, px));
     ao *= mix(0.35, 1.0, smoothstep(0.163, 0.205, length(vP.xy))) * mix(0.45, 1.0, smoothstep(0.028, 0.060, length(vP.xy - uPivot)));
+  }
+  if (uMode == 6 || uMode == 7) {                       // ILMC: crusted beige plastic, lumps and grime in the hollows
+    float sc = uMode == 7 ? 70.0 : 45.0, e = 0.05;
+    vec3 q = vP * sc; float h0 = crust(q);
+    vec3 gr = vec3(crust(q + vec3(e, 0, 0)) - h0, crust(q + vec3(0, e, 0)) - h0, crust(q + vec3(0, 0, e)) - h0) / e;
+    N = normalize(N - (gr - dot(gr, N) * N) * (uMode == 7 ? 0.45 : 0.25));
+    float grime = smoothstep(0.5, 0.8, crust(q * 0.4 + 3.0));
+    alb *= (0.88 + 0.22 * h0) * mix(1.0, 0.62, grime);
+    rough = clamp(rough + 0.15 * (h0 - 0.5), 0.2, 1.0);
+    if (uMode == 6 && N.z > 0.5) ao *= mix(0.35, 1.0, smoothstep(0.163, 0.205, length(vP.xy))) * mix(0.45, 1.0, smoothstep(0.028, 0.060, length(vP.xy - uPivot)));
   }
   if (uMode == 5) {                                     // table: occlusion under the plinth
     vec2 q = abs(vP.xy - vec2(0.0425, 0.0)) - vec2(0.2275, 0.19);
@@ -149,7 +186,7 @@ void main() {
       groove += s * lc * (vec3(0.72, 0.70, 0.67) + 0.28 * cos(6.2832 * (th * 9.0 + r * 55.0 + vec3(0.0, 0.33, 0.67))));
     }
     float fr = pow(1.0 - max(dot(N, V), 0.0), 5.0);
-    vec3 land = vec3(0.0012) + env(reflect(-V, N), 0.07) * (0.045 + 0.955 * fr) * (0.5 + 0.5 * sh) + brdf(N, V, L1, vec3(0.045), vec3(0.002), 0.12) * KEYC * key;
+    vec3 land = vec3(0.0012) + (env(reflect(-V, N), 0.07) + screensSeen(vP, reflect(-V, N), 0.07)) * (0.045 + 0.955 * fr) * (0.5 + 0.5 * sh) + brdf(N, V, L1, vec3(0.045), vec3(0.002), 0.12) * KEYC * key;
     c = mix(land, groove, cover);
     for (int i = 0; i < uNScr; i++) {                          // scratches catch the light
       vec4 s = uScr[i];

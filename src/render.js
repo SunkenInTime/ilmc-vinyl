@@ -15,6 +15,7 @@ const P3 = [ARM_LE - 0.040 * CB, 0.040 * SB, -0.0125];
 const TUBE = G.bezier([0, 0, 0], [0.075 * Math.cos(0.28), 0.075 * Math.sin(0.28), -0.003], [P3[0] - 0.075 * CB, P3[1] + 0.075 * SB, -0.0085], P3, 32);
 const REST_PT = TUBE[20];
 const STROBE = [-0.158, -0.160], LAMP = [STROBE[0] + 0.7026 * 0.024, STROBE[1] + 0.7115 * 0.024, -0.013];
+const NO_LIGHTS = new Float32Array(32), NO_COLS = new Float32Array(24), NO_AMB = new Float32Array(3);   // ILMC screen lights (shaders.js), off
 const BLACK = [0.012, 0.012, 0.013], CHROME = [0.62, 0.63, 0.66], AMBER = [1.0, 0.55, 0.12];
 
 export class Renderer {
@@ -83,6 +84,7 @@ export class Renderer {
   }
 
   setLabel(titles) {
+    this.titles = titles;
     const c = drawLabel(titles);                 // the artwork is in label.js
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, this.tex.label);
@@ -115,11 +117,18 @@ export class Renderer {
   // orbit camera: st.az (around the deck), st.el (elevation), st.zoom (0 = whole deck, 1 = at the stylus, < 0 = further away)
   camera(st) {
     const c = this.canvas, asp = c.width / c.height, z = st.zoom, zi = Math.max(0, z), [sx, sy] = stylusXY(st.al);
-    const at = st.at || [lerp(0.042, sx, zi), lerp(0, sy, zi), lerp(-0.015, 0, zi)], base = Math.max(0.95, 0.95 * 1.5 / asp);
-    const dist = st.dist || (z >= 0 ? lerp(base, 0.06, z) : base * Math.exp(-0.9 * z)), ce = Math.cos(st.el);   // z < 0 pulls back
+    let at = st.at || [lerp(0.042, sx, zi), lerp(0, sy, zi), lerp(-0.015, 0, zi)], base = Math.max(0.95, 0.95 * 1.5 / asp);
+    let dist = st.dist || (z >= 0 ? lerp(base, 0.06, z) : base * Math.exp(-0.9 * z));   // z < 0 pulls back
+    const ce = Math.cos(st.el);
     const eye = [at[0] + dist * ce * Math.sin(st.az), at[1] - dist * ce * Math.cos(st.az), at[2] + dist * Math.sin(st.el)];
-    const v = G.lookAt(eye, at);
-    this.cam = { eye, asp, ...v, vp: G.mul(G.perspective(FOV, asp, lerp(0.05, 0.004, zi), 150), v.m) };
+    let up = [0, 0, 1];
+    if (st.roll) {                                                        // bank: turn the up vector about the view direction
+      const f = G.norm([at[0] - eye[0], at[1] - eye[1], at[2] - eye[2]]), r = G.norm([f[1], -f[0], 0]), u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+      up = u.map((v, i) => v * Math.cos(st.roll) + r[i] * Math.sin(st.roll));
+    }
+    const v = G.lookAt(eye, at, up);
+    const proj = G.perspective(FOV, asp, lerp(0.05, 0.004, zi), 150);
+    this.cam = { eye, asp, ...v, proj, vp: G.mul(proj, v.m) };
     return this.cam;
   }
 
@@ -151,6 +160,7 @@ export class Renderer {
     const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     const cam = this.camera(st);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.colorMask(true, true, true, true);   // the room (three.js) shares this context
     const spin = G.Rz(-st.thp), discM = G.chain(spin, G.T(ecc[0], ecc[1], 0));
     const arm = G.chain(G.T(PIVOT_X, PIVOT_Y, PIVOT_H), G.Rz(st.al), G.Ry(-Math.asin(Math.max(-0.2, Math.min(0.2, st.zt / ARM_LE)))));
     const head = G.chain(arm, G.T(ARM_LE, 0, 0), G.Rz(-ARM_BETA));
@@ -160,11 +170,11 @@ export class Renderer {
     // [mesh, model, albedo, roughness, metalness, mode, emissive]
     const items = [
       [m.floor, I, [0.020, 0.020, 0.022], 0.55, 0, 5, off], [m.feet, I, BLACK, 0.8, 0, 0, off],
-      [m.body, I, BLACK, 0.62, 0, 0, off], [m.plate, I, [0.045, 0.047, 0.052], 0.46, 0.75, 2, off],
+      [m.body, I, st.ilmc ? [0.42, 0.37, 0.28] : BLACK, 0.62, 0, st.ilmc ? 7 : 0, off], [m.plate, I, st.ilmc ? [0.5, 0.49, 0.45] : [0.045, 0.047, 0.052], 0.46, st.ilmc ? 0.05 : 0.75, st.ilmc ? 6 : 2, off],
       [m.platter, spin, [0.075, 0.075, 0.08], 0.36, 1, 3, off], [m.mat, spin, [0.010, 0.010, 0.010], 0.9, 0, 0, off],
       [m.spindle, I, CHROME, 0.14, 1, 1, off],
       [m.strobe, I, [0.02, 0.02, 0.022], 0.4, 0.5, 0, off], [m.lens, lensM, [0.15, 0.01, 0.01], 0.3, 0, 0, [2.4 * on, 0.16 * on, 0.05 * on]],
-      [m.buttons, I, [0.028, 0.028, 0.030], 0.42, 0.3, 0, off], [m.slot, I, [0.004, 0.004, 0.004], 0.25, 0, 0, off],
+      [m.buttons, I, st.ilmc ? [0.33, 0.3, 0.24] : [0.028, 0.028, 0.030], 0.42, 0.3, 0, off], [m.slot, I, [0.004, 0.004, 0.004], 0.25, 0, 0, off],
       [m.ledStart, I, [0.05, 0.03, 0.01], 0.3, 0, 0, glow(on)], [m.led33, I, [0.05, 0.03, 0.01], 0.3, 0, 0, glow(r33 ? 1 : 0)],
       [m.led45, I, [0.05, 0.03, 0.01], 0.3, 0, 0, glow(r45 ? 1 : 0)], [m.ledPitch, I, [0.01, 0.05, 0.02], 0.3, 0, 0, glow(1, [0.2, 1.0, 0.35])],
       [m.tower, I, [0.020, 0.020, 0.022], 0.38, 0.6, 0, off], [m.towerCap, I, CHROME, 0.16, 1, 0, off],
@@ -188,6 +198,7 @@ export class Renderer {
     const common = (u) => {
       gl.uniformMatrix4fv(u.uVP, false, cam.vp); gl.uniformMatrix4fv(u.uLVP, false, this.lvp); gl.uniform3fv(u.uEye, cam.eye);
       gl.uniform1i(u.uShadow, 3); gl.uniform4f(u.uLamp, LAMP[0], LAMP[1], LAMP[2], on);
+      gl.uniform4fv(u.uSL, st.lights?.pos || NO_LIGHTS); gl.uniform3fv(u.uSC, st.lights?.col || NO_COLS); gl.uniform3fv(u.uAmb, st.lights?.amb || NO_AMB); gl.uniform1f(u.uKeyK, st.lights?.key ?? 1);
     };
     let u = this.std.u;
     gl.useProgram(this.std.p); common(u); gl.uniform2f(u.uPivot, PIVOT_X, PIVOT_Y);

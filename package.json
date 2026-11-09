@@ -1,16 +1,19 @@
 {
-  "name": "vinyl",
+  "name": "ilmc-vinyl",
   "private": true,
-  "description": "A record player simulated from the groove up",
+  "description": "A record player simulated from the groove up, remixed for Ninajirachi's I Love My Computer. Bring your own copy.",
   "license": "MIT",
-  "repository": "github:rauchg/vinyl",
-  "homepage": "https://vinyl-gl.vercel.app",
-  "engines": { "node": ">=22" },
+  "repository": "github:SunkenInTime/ilmc-vinyl",
+  "homepage": "https://ilmc.daracloud.uk",
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
     "lathe": "node lathe.mjs all",
     "test": "node test/basic.mjs && node test/response.mjs && node test/noise.mjs && node test/scenario.mjs",
-    "bench": "node test/bench.mjs"
+    "bench": "node test/bench.mjs",
+    "deploy": "node build.mjs && npx wrangler@4 deploy"
   }
 }

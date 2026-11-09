@@ -81,7 +81,11 @@ function arcText(k, text, r, gap) {
   });
 }
 
+let art = null;   // a record can bring its own label (src/ilmc/label.js)
+export function setLabelArt(fn) { art = fn; }
+
 export function drawLabel(titles = []) {
+  const own = art && art(titles); if (own) return own;
   stock ||= paper();
   const c = sheet(), x = c.getContext('2d');
   x.drawImage(stock, 0, 0);

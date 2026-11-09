@@ -3,17 +3,32 @@ import { Renderer } from './render.js';
 import { TAU } from './dsp.js';
 import { RECORDS } from './records.js';
 import { press, makeVis } from './press.js';
-import { PIVOT_X, PIVOT_Y, ALPHA_REST, R_DISC, R_LABEL, R_LEADIN, W33, alphaForRadius, stylusXY } from './geometry.js';
+import { PIVOT_X, PIVOT_Y, ALPHA_REST, R_DISC, R_LABEL, R_LEADIN, W33, alphaForRadius, stylusXY, grooveRadius } from './geometry.js';
+import { ILMC } from './ilmc/index.js';
+import { ilmcLabel } from './ilmc/label.js';
+import { setLabelArt } from './label.js';
+import { art } from './ilmc/art.js';
+import { readMeta } from './ilmc/meta.js';
+import { envelope, match } from './ilmc/match.js';
+import { sfx } from './ilmc/sfx.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('gl'), renderer = new Renderer(canvas);
+// ?og (the share image) and ?plain (the deck on its own) skip the room
+const PLAIN = /[?&](og|plain)/.test(location.search);
+const reduceFlashing = () => { try { const v = localStorage.getItem('ilmc-flash'); return v ? v === 'off' : matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+const ilmc = PLAIN ? null : new ILMC(renderer.gl, canvas, { overlay: $('words'), reduceFlashing: reduceFlashing() });
+// the label: the ILMC picture label with the visitor's own album art, when the record in the drive is the song
+setLabelArt(() => (!PLAIN && S.matched ? ilmcLabel(art.img, art.has()) : null));
+art.on(() => { if (renderer.titles) renderer.setLabel(renderer.titles); });
 let masterWorker = null;      // the lathe + pressing plant; only started if something has to be mastered in the browser
 const worker = { postMessage: (m, transfer) => { busy(); (masterWorker ||= startWorker()).postMessage(m, transfer || []); } };
 // The progress bar (index.html) shows window.__load: a download with got/total, or just "busy" when the size is unknown.
 const busy = (h = { got: 0, total: 0 }) => (window.__load = h);
 const idle = () => { if (window.__load) window.__load.done = true; };
-const AZ0 = -0.5, EL0 = 0.6;   // default camera
-const S = { hudOn: false, lastDown: 0, tel: null, tRecv: 0, zoom: 0, zoomT: 0, az: AZ0, el: EL0, rpm: 33.3333, rec: null, pending: null, motor: false, cue: true, ready: false };
+const AZ0 = -0.5, EL0 = PLAIN_CAM() ? 0.6 : 0.86, ZOOM0 = PLAIN_CAM() ? 0 : -1.35;   // default camera: pulled back to see the room
+function PLAIN_CAM() { return /[?&](og|plain)/.test(location.search); }
+const S = { hudOn: false, lastDown: 0, tel: null, tRecv: 0, zoom: ZOOM0, zoomT: ZOOM0, az: AZ0, el: EL0, rpm: 33.3333, rec: null, pending: null, motor: false, cue: true, ready: false };
 let ctx = null, node = null, drag = null;
 // ?og renders just the deck on black, with no interface and no audio: it is how og.png (the share image) is made
 const OG = new URLSearchParams(location.search).has('og');
@@ -27,9 +42,9 @@ const condition = () => Object.fromEntries(['noise', 'dust', 'scratches', 'warp'
 function startWorker() {
   const w = new Worker(new URL('./master-worker.js', import.meta.url), { type: 'module' });
   w.onmessage = ({ data: m }) => {
-    if (m.t === 'status') status(m.msg + '...');
-    else if (m.t === 'error') { idle(); status('Mastering failed: ' + m.msg); console.error(m.msg); }
-    else if (m.t === 'done') { if (m.id == null || m.id === pick) gotRecord(m.rec, m.vis); }
+    if (m.t === 'status') { status(m.msg + '...'); if ($('insert-status') && S.fileCut) $('insert-status').textContent = m.msg; }
+    else if (m.t === 'error') { idle(); status('Mastering failed: ' + m.msg); console.error(m.msg); if (S.fileCut) { S.fileCut = 0; sfx.error(); insertState('error', { err: 'Cutting failed: ' + m.msg }); } }
+    else if (m.t === 'done') { if (m.id == null || m.id === pick) { gotRecord(m.rec, m.vis); if (S.fileCut === pick) { S.fileCut = 0; fileReady(); } } }
   };
   return w;
 }
@@ -51,6 +66,7 @@ function loadRecord() {
   // what the track readout maps the needle onto; seq comes back in the telemetry once the audio thread has it,
   // so a packet about the previous record can't be read against this one
   S.rec = { tracks: rec.tracks, thetaLock: rec.thetaLock, pick: S.pendingPick, seq: S.recSeq = (S.recSeq || 0) + 1 };
+  S.rtab = rec.rTab;
   send({ t: 'cue', up: true });
   send({ t: 'record', rec, seq: S.rec.seq }, [rec.wallIn.buffer, rec.wallOut.buffer]);
   S.loaded = true;
@@ -145,6 +161,7 @@ function initAudio() {
       } else if (m.t === 'log') console.warn(m.msg);
     };
     node.connect(ctx.destination);
+    ilmc?.attachAudio(ctx, node);
     if (!S.on && ctx.state === 'running') await ctx.suspend();   // some browsers start it unasked; stay silent until power-on
   })().catch((err) => { audioInit = null; ctx = null; node = null; throw err; });
 }
@@ -152,6 +169,7 @@ const POWER_MSG = matchMedia('(pointer: coarse)').matches ? 'tap to power on' : 
 async function powerOn() {
   if (S.on) return;
   S.on = true; $('power').classList.add('busy');      // a spinner until the engine is warm AND the record is in it
+  if ($('insert')?.dataset.state === 'cutting') S.waitCut = true;
   powerMsg();
   try {
     if (ctx) ctx.resume().catch(() => {});            // straight away, inside the gesture: iOS only honours it there
@@ -172,7 +190,7 @@ function powerMsg() {
   const el = $('power-msg');
   if (el && S.on && !S.started) el.textContent = $('status').textContent.replace(/\.+$/, '') || (S.loaded ? (S.ready ? 'starting' : 'warming up') : 'loading the record');
 }
-$('power').addEventListener('click', powerOn);       // the pill; a tap on the scene powers on too (see the pointer handlers)
+$('power-msg').addEventListener('click', powerOn);   // the pill (shown while warming up); the insert window's buttons power on too
 $('power-msg').textContent = POWER_MSG;
 if (!OG) initAudio().catch(() => {});   // best effort before any gesture; the click retries if the browser refused
 
@@ -202,34 +220,88 @@ addEventListener('pointerdown', (e) => {
 }, true);
 addEventListener('keydown', (e) => { if (e.key === 'Escape') for (const [panel, btn] of PANELS) if (!$(panel).hidden) $(btn).click(); });
 $('t-reset').addEventListener('click', () => {      // ease the camera back to where it started
-  S.zoomT = 0; S.resetting = true;
+  S.zoomT = ZOOM0; S.resetting = true;
   S.az = AZ0 + ((((S.az - AZ0 + Math.PI) % TAU) + TAU) % TAU) - Math.PI;   // unwind full turns first
 });
 $('b-more').addEventListener('click', () => { $('more').showModal(); $('more').scrollTop = 0; });
 $('more').addEventListener('click', (e) => { if (e.target === $('more')) $('more').close(); });   // click outside closes
 $('b-start').addEventListener('click', () => setMotor(!S.motor));
+document.addEventListener('click', (e) => { if (e.target.closest('button, a, label.file, select') && !e.target.closest('#b-insert, #b-other')) sfx.click(); }, true);
+const showSfx = () => { $('b-sfx').textContent = sfx.on ? 'Sounds on' : 'Sounds off'; $('b-sfx').classList.toggle('on', sfx.on); };
+$('b-sfx').addEventListener('click', () => { sfx.set(!sfx.on); showSfx(); }); showSfx();
+for (const b of document.querySelectorAll('[data-close]')) b.addEventListener('click', () => $(b.dataset.close).click());
+$('b-more').addEventListener('click', () => sfx.open());
+function showFlash() { const on = ilmc && !ilmc.reduce; $('t-flash').textContent = on ? 'Flashing on' : 'Flashing off'; $('t-flash').setAttribute('aria-pressed', String(on)); }
+if (ilmc) { showFlash(); $('t-flash').addEventListener('click', () => { ilmc.reduce = !ilmc.reduce; try { localStorage.setItem('ilmc-flash', ilmc.reduce ? 'off' : 'on'); } catch {} showFlash(); }); } else $('t-flash').hidden = true;
 $('b-cue').addEventListener('click', () => send({ t: 'cue', up: !S.cue }));
 $('b-bump').addEventListener('click', () => send({ t: 'bump', s: 1 }));
 $('b-press').addEventListener('click', pressAgain);
 for (const b of document.querySelectorAll('[data-rpm]')) {
   b.addEventListener('click', () => { document.querySelectorAll('[data-rpm]').forEach((x) => x.classList.toggle('on', x === b)); S.rpm = +b.dataset.rpm; send({ t: 'speed', rpm: S.rpm }); });
 }
+// ---------- bring your own copy ----------
+// The file is decoded, cut and pressed here, in this browser; nothing is uploaded. Its tags and art come from the file.
+// If its loudness over time matches the song map, the room plays along to the song (assets/ilmc/fmc.json).
+const AUDIO = /\.(mp3|flac|wav|wave|m4a|mp4|aac|alac|ogg|oga|opus|aif|aiff|webm|weba)$/i;
+let fmc = null;
+const songMap = () => (fmc ||= fetch('assets/ilmc/fmc.json').then((r) => { if (!r.ok) throw new Error('no map'); return r.json(); })
+  .then((m) => Object.assign(m, { envBytes: Uint8Array.from(atob(m.env), (c) => c.charCodeAt(0)) })));
+if (!PLAIN) songMap().catch(() => {});
+function insertState(state, extra = {}) {
+  const el = $('insert'); if (!el) return;
+  el.dataset.state = state;
+  if (extra.err) $('insert-err').textContent = extra.err;
+  if (extra.title != null) $('insert-title').textContent = extra.title;
+  if (extra.note != null) $('insert-note').textContent = extra.note;
+}
 async function cutFiles(files) {
-  const list = [...files].filter((f) => f.type.startsWith('audio/') || /\.(mp3|wav|flac|m4a|ogg|aiff?)$/i.test(f.name));
-  if (!list.length) return;
-  status('Decoding...');
-  const tracks = [], transfer = [];
+  const list = [...files].filter((f) => f.type.startsWith('audio/') || f.type.startsWith('video/') || AUDIO.test(f.name));
+  if (!list.length) { sfx.error(); insertState('error', { err: "That doesn't look like an audio file." }); return status("That doesn't look like an audio file."); }
+  const me = ++pick; S.fileCut = me; sfx.insert();
+  insertState('cutting'); status('Reading the file...');
+  const tracks = [], transfer = []; let first = null;
   for (const f of list) {
     try {
-      const ab = await new OfflineAudioContext(2, 1, 48000).decodeAudioData(await f.arrayBuffer());
+      const buf = await f.arrayBuffer();
+      const tags = first ? {} : readMeta(buf);                         // before decoding: decoding detaches the buffer
+      status(`Decoding ${f.name}...`);
+      const ab = await new OfflineAudioContext(2, 1, 48000).decodeAudioData(buf);
+      if (me !== pick) return;
+      if (!first) first = { tags, env: envelope(ab), dur: ab.duration };
       const L = ab.getChannelData(0).slice(), R = ab.numberOfChannels > 1 ? ab.getChannelData(1).slice() : L.slice();
-      tracks.push({ L, R, title: f.name.replace(/\.[^.]+$/, '') }); transfer.push(L.buffer, R.buffer);
+      tracks.push({ L, R, title: (tracks.length ? '' : tags.title) || f.name.replace(/\.[^.]+$/, '') }); transfer.push(L.buffer, R.buffer);
     } catch (err) { console.error(err); }
   }
-  if (!tracks.length) return status('Could not decode that audio.');
-  S.workerHasSource = true; S.man = null; pick++; markRecord(null);
-  worker.postMessage({ t: 'tracks', tracks, fs: 48000, cond: condition() }, transfer);
+  if (!tracks.length) {
+    sfx.error(); const msg = `This browser can't read ${list[0].name}. MP3, FLAC, WAV or M4A work everywhere.`;
+    insertState('error', { err: msg }); return status(msg);
+  }
+  // is it the song?
+  let m = { r: 0, lag: 0 }, map = null;
+  if (ilmc) { try { map = await songMap(); m = match(first.env, map.envBytes); } catch (err) { console.warn(err); } }
+  if (me !== pick) return;
+  S.matched = !!map && m.r > 0.8;
+  const t = first.tags, title = t.title || (S.matched ? map.track.title : tracks[0].title);
+  art.set({ title, artist: t.artist || (S.matched ? map.track.artist : ''), album: t.album || (S.matched ? map.track.album : ''), dur: first.dur, pic: t.pic || null });
+  ilmc?.setSong(S.matched ? map : null, m.lag);
+  console.info(`match r=${m.r.toFixed(3)} lag=${m.lag.toFixed(2)}s`);
+  S.workerHasSource = true; S.man = null; markRecord(null); S.recTitle = title; nowPlaying(title);
+  status(S.matched ? 'Cutting the groove...' : 'Cutting the groove...');
+  $('insert-status').textContent = S.matched ? `${title}, recognised. Cutting the groove` : `${title}. Cutting the groove`;
+  worker.postMessage({ t: 'tracks', id: me, tracks, fs: 48000, cond: condition() }, transfer);
 }
+// called once the visitor's record is cut and pressed
+function fileReady() {
+  const title = art.title || 'Your record';
+  if (S.matched) { sfx.match(); insertState('ready', { title: `${title}${art.artist ? ' · ' + art.artist : ''}`, note: art.has() ? 'Recognised. The room knows this one.' : 'Recognised. The room knows this one (no album art in the file, so the label is plain).' }); }
+  else { sfx.open(); insertState('ready', { title, note: "Not Fuck My Computer, as far as this page can tell, so the room will follow its kicks instead. It still plays." }); }
+  if (S.started) status(S.matched ? `${title}: recognised` : '');
+}
+$('b-insert').addEventListener('click', () => $('f-audio').click());
+$('b-other').addEventListener('click', () => $('f-audio').click());
+$('b-play').addEventListener('click', (e) => { e.stopPropagation(); powerOn(); });
+$('b-demo').addEventListener('click', (e) => { e.stopPropagation(); powerOn(); });
+$('f-audio').addEventListener('cancel', () => { if ($('insert')?.dataset.state === 'cutting') insertState('idle'); });
 
 // ---------- record shelf: free-to-ship recordings (src/records.js, audio in records/), precompiled into assets/<id>/ ----------
 const shelf = $('shelf'), credit = shelf.appendChild(document.createElement('p'));
@@ -251,6 +323,8 @@ function markRecord(r) {
 async function pickRecord(r) {
   const me = ++pick;
   markRecord(r);
+  ilmc?.setSong(null); S.matched = false; S.fileCut = 0;          // the shelf's records have no map: the room follows their kicks
+  art.set({ title: r.title, artist: r.by });
   if (!r.tracks) return houseRecord();
   S.workerHasSource = false;
   try { await loadPrecompiled(`assets/${r.id}/`, me); }
@@ -274,6 +348,12 @@ async function master(r, me, seed) {            // the slow way: fetch the audio
     worker.postMessage({ t: 'tracks', id: me, tracks, fs: 48000, opts: r.cut, cond: condition(), seed }, transfer);
   } catch (err) { console.error(err); if (me === pick) { idle(); status(`Could not load ${r.title}.`); } }
 }
+{
+  const b = document.createElement('button'); b.className = 'insert';
+  b.append(Object.assign(document.createElement('b'), { textContent: 'Insert your copy' }), Object.assign(document.createElement('span'), { textContent: 'MP3 · FLAC · WAV · M4A' }));
+  b.addEventListener('click', () => { $('f-audio').click(); b.blur(); });
+  shelf.insertBefore(b, credit);
+}
 for (const r of RECORDS) {
   const b = document.createElement('button');
   b.dataset.id = r.id;
@@ -281,16 +361,19 @@ for (const r of RECORDS) {
   b.addEventListener('click', () => { pickRecord(r); b.blur(); });
   shelf.insertBefore(b, credit);
 }
-pickRecord(RECORDS.find((r) => r.id === (window.__boot?.id || 'rhapsody')) || RECORDS[0]);   // the record on the platter when the page opens
+pickRecord(RECORDS.find((r) => r.id === (window.__boot?.id || 'mountain-king')) || RECORDS[0]);   // the record on the platter when the page opens
 $('f-audio').addEventListener('change', (e) => cutFiles(e.target.files));
+let dragN = 0;
+addEventListener('dragenter', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragN++; document.documentElement.classList.add('dragging'); } });
+addEventListener('dragleave', () => { if (--dragN <= 0) { dragN = 0; document.documentElement.classList.remove('dragging'); } });
 addEventListener('dragover', (e) => e.preventDefault());
-addEventListener('drop', (e) => { e.preventDefault(); cutFiles(e.dataTransfer.files); });
+addEventListener('drop', (e) => { e.preventDefault(); dragN = 0; document.documentElement.classList.remove('dragging'); if (e.dataTransfer?.files?.length) cutFiles(e.dataTransfer.files); });
 addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.code === 'Space') { e.preventDefault(); setMotor(!S.motor); }
   else if (e.key === 'c') send({ t: 'cue', up: !S.cue });
   else if (e.key === 'b') send({ t: 'bump', s: 1 });
-  else if (e.key === 'z') S.zoomT = S.zoomT > 0.5 ? 0 : 0.92;
+  else if (e.key === 'z') S.zoomT = S.zoomT > 0.5 ? ZOOM0 : 0.92;
 });
 
 // ---------- pointer: grab the headshell, spin the record, or click to drop the needle ----------
@@ -324,7 +407,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (!drag) return;
   if (drag.type === 'pinch') {
     const [a, b] = [...touches.values()];
-    if (b) S.zoomT = Math.max(-0.8, Math.min(0.985, drag.z0 + 0.6 * Math.log(Math.hypot(a[0] - b[0], a[1] - b[1]) / drag.d0)));
+    if (b) S.zoomT = Math.max(-1.6, Math.min(0.985, drag.z0 + 0.6 * Math.log(Math.hypot(a[0] - b[0], a[1] - b[1]) / drag.d0)));
   } else if (drag.type === 'orbit') {
     S.az -= (e.clientX - drag.x) * 0.006; S.el = Math.max(0.02, Math.min(1.55, S.el + (e.clientY - drag.y) * 0.006)); S.resetting = false;
     drag.x = e.clientX; drag.y = e.clientY;
@@ -358,13 +441,14 @@ for (const type of ['touchend', 'click']) canvas.addEventListener(type, () => {
   if (!S.on && S.tapped && performance.now() - S.tapped < 800 && document.documentElement.classList.contains('ready')) { S.tapped = 0; powerOn(); }
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-canvas.addEventListener('wheel', (e) => { e.preventDefault(); S.zoomT = Math.max(-0.8, Math.min(0.985, S.zoomT - e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))); }, { passive: false });
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); S.zoomT = Math.max(-1.6, Math.min(0.985, S.zoomT - e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))); }, { passive: false });
 
 // ---------- HUD ----------
 const scope = $('scope'), sc = scope.getContext('2d');
 function drawScope() {
   const w = scope.width, h = scope.height, v = S.view, rows = 5, cols = 160, k = (h / 2) / 95e-6;
-  sc.fillStyle = '#1c1c20'; sc.fillRect(0, 0, w, h);
+  sc.fillStyle = '#0c0f18'; sc.fillRect(0, 0, w, h);
+  sc.fillStyle = 'rgba(166,202,240,.05)'; for (let y = 0; y < h; y += 3) sc.fillRect(0, y, w, 1);   // faint scanlines
   if (!v) return;
   const X = (c) => c / (cols - 1) * w, Y = (m) => h / 2 - m * k;
   const fill = new Path2D(), edge = new Path2D();
@@ -377,11 +461,11 @@ function drawScope() {
       edge.moveTo(x0, Y(a0)); edge.lineTo(x1, Y(a1)); edge.moveTo(x0, Y(b0)); edge.lineTo(x1, Y(b1));
     }
   }
-  sc.fillStyle = '#060607'; sc.fill(fill);
-  sc.strokeStyle = '#b9b2a6'; sc.lineWidth = 1.5; sc.stroke(edge);
+  sc.fillStyle = '#04060c'; sc.fill(fill);
+  sc.strokeStyle = '#cfe0ff'; sc.lineWidth = 1.5; sc.stroke(edge);
   const xg = v[rows * cols * 2], hc = v[rows * cols * 2 + 1], down = hc < 40e-6;
-  sc.strokeStyle = 'rgba(255,180,84,.35)'; sc.lineWidth = 1; sc.beginPath(); sc.moveTo(w / 2, 0); sc.lineTo(w / 2, h); sc.stroke();
-  sc.fillStyle = down ? '#ffb454' : 'rgba(255,180,84,.25)';
+  sc.strokeStyle = 'rgba(255,225,10,.3)'; sc.lineWidth = 1; sc.beginPath(); sc.moveTo(w / 2, 0); sc.lineTo(w / 2, h); sc.stroke();
+  sc.fillStyle = down ? '#ffe10a' : 'rgba(255,225,10,.25)';
   sc.beginPath(); sc.arc(w / 2, Y(xg === xg ? xg : 0), Math.max(5, 13e-6 * k), 0, TAU); sc.fill();
 }
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -416,6 +500,18 @@ function drawStats() {
     : t.theta >= S.rec.thetaLock ? 'run-out' : t.theta > S.rec.tracks[S.rec.tracks.length - 1].theta1 ? 'lead-out' : t.theta < S.rec.tracks[0].theta0 ? 'lead-in' : 'between tracks');
 }
 
+// where the needle is in the song, for the room: seconds into the first track, and how fast the groove is going by
+function songPos(t, dt) {
+  if (!t || !S.rec || t.recSeq !== S.rec.seq || !S.rec.tracks.length) return null;
+  const on = t.hc < 40e-6 && t.xg === t.xg, th = t.theta + (on ? t.wp * dt : 0);
+  return { t: (th - S.rec.tracks[0].theta0) / W33, on, rate: t.wp / W33 };
+}
+// jump the needle to a moment in the song (debugging, and the screenshots)
+function seek(sec) {
+  if (!S.rec || !S.rtab) return;
+  send({ t: 'cueTo', al: alphaForRadius(grooveRadius(S.rtab, S.rec.tracks[0].theta0 + sec * W33)) });
+}
+
 // ---------- frame loop ----------
 let frame = 0;
 // One failing part must never stop the frame loop: that froze the picture while the sound carried on.
@@ -437,14 +533,22 @@ function tick() {
     S.az += (AZ0 - S.az) * 0.12; S.el += (EL0 - S.el) * 0.12;
     if (Math.abs(S.az - AZ0) < 1e-3 && Math.abs(S.el - EL0) < 1e-3) { S.az = AZ0; S.el = EL0; S.resetting = false; }
   }
-  const moved = Math.abs(S.zoomT) > 0.01 || Math.abs(S.az - AZ0) > 0.01 || Math.abs(S.el - EL0) > 0.01;
+  const moved = Math.abs(S.zoomT - ZOOM0) > 0.01 || Math.abs(S.az - AZ0) > 0.01 || Math.abs(S.el - EL0) > 0.01;
   if (moved !== S.moved) { S.moved = moved; $('t-reset').hidden = !moved; }
   guard('render', () => {
     if (OG) renderer.draw({ thp: 2.2, al: alphaForRadius(0.108), zt: 0, zoom: 0, az: -0.5, el: 0.6, motor: true, rpm: 33.3333, bare: true, dist: 1.1, at: [0.021, -0.07, -0.093], ...window.__og });   // deck high in the frame: X overlays the bottom
-    else renderer.draw({ thp: t ? t.thp + t.wp * dt : 0, al: t ? t.al : ALPHA_REST, zt: t ? t.zb + t.ze : 5e-3, zoom: S.zoom, az: S.az, el: S.el, motor: S.motor, rpm: S.rpm });
+    else {
+      const now = performance.now(), fdt = S.tPrev ? (now - S.tPrev) / 1000 : 0; S.tPrev = now;
+      let room = null;
+      try { room = ilmc ? ilmc.update(fdt, songPos(t, dt)) : null; } catch (err) { if (!S.roomErr) { S.roomErr = true; console.error('room', err); } }   // the deck keeps drawing whatever the room does
+      const c = room ? room.cam : { az: 0, el: 0, zoom: 0 };
+      const az = S.az + c.az, el = Math.max(0.02, Math.min(1.55, S.el + c.el));
+      renderer.draw({ thp: t ? t.thp + t.wp * dt : 0, al: t ? t.al : ALPHA_REST, zt: t ? t.zb + t.ze : 5e-3, zoom: S.zoom + c.zoom, az, el, roll: c.roll || 0, motor: S.motor, rpm: S.rpm, lights: room?.lights, bare: room?.bare, ilmc: !!room });
+      if (ilmc && room) ilmc.render(renderer.cam, room.post);
+    }
   });
   if (frame++ % 2 === 0 && S.hudOn) guard('groove view', drawScope);
   if (frame % 6 === 0) guard('readout', drawStats);
 }
 tick();
-window.__rp = { S, get ctx() { return ctx; }, send, renderer, stylusXY };   // debugging handle
+window.__rp = { S, get ctx() { return ctx; }, send, renderer, stylusXY, ilmc, seek };   // debugging handle

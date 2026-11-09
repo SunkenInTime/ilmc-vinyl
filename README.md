@@ -1,33 +1,66 @@
-# vinyl
+# I Love My Computer, on a simulated record player
 
-A record player simulated "from the groove up" in the browser: **[vinyl-gl.vercel.app](https://vinyl-gl.vercel.app)**.
+A fan remix of Guillermo Rauch's [vinyl](https://github.com/rauchg/vinyl), rebuilt as a love letter to Ninajirachi's album [_I Love My Computer_](https://ninajirachi.bandcamp.com/album/i-love-my-computer): **[ilmc.daracloud.uk](https://ilmc.daracloud.uk)**.
 
-Instead of playing an audio file, the music is cut into a spiral [groove](https://en.wikipedia.org/wiki/Phonograph_record), and a simulated [stylus](https://en.wikipedia.org/wiki/Phonograph#Stylus), cantilever, [tonearm](https://en.wikipedia.org/wiki/Phonograph#Arm_systems) and [cartridge](https://en.wikipedia.org/wiki/Magnetic_cartridge) read it back on the audio thread. What you hear is the voltage that motion would induce in the cartridge, after phono equalisation.
+The deck is Guillermo's physical simulation: music is cut into a spiral groove and a simulated stylus, cantilever, tonearm and cartridge read it back. Around it this remix adds a room of old computers that plays along. Bring your copy of _Fuck My Computer_ and the room knows the song: the screens answer her lyrics, the machines fire CDs on her vocal chops through the build-ups, and on each drop the floor falls away and everything flies through Y2K wallpaper skies. Any other song works too; the room follows its kicks.
 
-This is a _physical simulation_ of a record player's mechanics, which happen to play sound.
+![A drop: the deck flying through a Y2K sky with the computers around it](og.png)
 
-## Features
+## Bring your own copy
 
-- **"Real", procedural flaws**: hiss and crackle are roughness and dust on the groove walls. A scratch ticks once per turn because the needle crosses it once per turn. Treble dulls toward the label because the groove moves slower there. Knock the table and it skips.
-- **Real physics, in real time**: a 2 DOF stylus tip on [Hertzian](https://en.wikipedia.org/wiki/Contact_mechanics#Hertzian_theory_of_non-adhesive_elastic_contact) wall contacts with friction, oversampled inside an `AudioWorklet`, with platter inertia, arm kinematics, [RIAA de-emphasis](https://en.wikipedia.org/wiki/RIAA_equalization) and three stylus shapes (conical, elliptical, micro-line).
-- **Bring your own audio**: _Cut a file_ runs the lathe on anything you drop in, in a worker, in the browser. _Press again_ makes a dirtier (or cleaner) copy of the same cut.
-- **No dependencies, no bundler**: plain ES modules, WebGL2 and Web Audio. The build copies files.
+No music, album art or audio from the album is in this repository or on the site.
+
+- You insert your own file (MP3, FLAC, WAV, M4A/AAC, Ogg, Opus; whatever your browser can decode). It is decoded, cut and pressed in your browser. Nothing is uploaded.
+- The title, artist and album art come from the file's own tags ([`src/ilmc/meta.js`](src/ilmc/meta.js) reads ID3, FLAC, MP4 and Vorbis tags).
+- To recognise the song, the page compares your file's loudness over time with the song map ([`src/ilmc/match.js`](src/ilmc/match.js)). That works across encodings and a few seconds of extra silence, and tells it which way to shift the map.
+- The song map ([`assets/ilmc/fmc.json`](assets/ilmc/fmc.json)) holds what the room needs to play along: tempo, downbeats, sections, the build-ups, her vocal chops and timed lyrics. The timings were measured from the track; the lyric lines come from [LRCLIB](https://lrclib.net).
+
+If you don't have it, it's on [Bandcamp](https://ninajirachi.bandcamp.com/album/i-love-my-computer).
+
+## The room
+
+Everything around the deck is in [`src/ilmc/`](src/ilmc/), built with [three.js](https://threejs.org) (vendored in `src/vendor/`) in the deck's own WebGL context, so the computers share its depth buffer and their screens light the record:
+
+- `index.js` runs the room: the song map, the 4-5-6-2 jig, lyrics, build-ups, drops, lights and camera.
+- `models.js`, `hq.js` model the machines; `cables.js` grows the wiring around them; `discs.js` throws the CDs.
+- `screens.js` draws every screen; `overlay.js` puts the words on top; `post.js` adds bloom, glitch, PS1 dither and the digital motion blur.
+- `sfx.js` synthesises the interface sounds. No samples.
+
+The flashing can be turned down from the top bar, and starts reduced if your system asks for reduced motion.
 
 ## Running it
 
-```bash
-$ vercel dev
-```
-
-That's it. `vercel dev` runs the same build as production (`node build.mjs`, which writes `dist/`) and serves it on [localhost:3000](http://localhost:3000). It builds once, so restart it after editing.
-
-There's nothing to install. Node 22+ is enough for the build and the tests:
+Node 22+ and nothing to install:
 
 ```bash
-$ npm run build   # dist/: index.html, src/, assets/, records/
-$ npm test        # offline checks of the physics: response, distortion, surface noise, cue, skip
-$ npm run bench   # CPU cost of the engine per second of audio
+$ npm run build          # writes dist/
+$ npx serve dist         # any static server works; it must be https or localhost (AudioWorklet needs a secure context)
+$ npm test               # Guillermo's offline physics checks
 ```
+
+It deploys to Cloudflare as a static Worker (`wrangler.toml`):
+
+```bash
+$ npm run deploy         # build, then wrangler deploy
+```
+
+Cloudflare limits a file to 25 MiB, so the public shelf leaves out the five records whose cut is bigger (they're still in `records/` and play locally).
+
+## Credits
+
+- Deck, groove, physics, shelf: [Guillermo Rauch](https://github.com/rauchg/vinyl) (MIT).
+- The room: Dara Adedeji.
+- Music, lyrics, the :3 face and everything _I Love My Computer_: Ninajirachi. This is an unofficial fan project, not affiliated with her or her label.
+
+---
+
+# vinyl
+
+Guillermo's original README follows.
+
+A record player simulated "from the groove up" in the browser: **[vinyl-gl.vercel.app](https://vinyl-gl.vercel.app)**.
+
+Instead of playing an audio file, the music is cut into a spiral groove, and a simulated stylus, cantilever, tonearm and cartridge read it back on the audio thread. What you hear is the voltage that motion would induce in the cartridge, after phono equalisation.
 
 ## How it works
 
@@ -70,5 +103,7 @@ Every recording is public domain or freely licensed:
 Sources for each are linked in [`src/records.js`](src/records.js). The _Demo EP_ is synthesised by the page.
 
 ## License
+
+The remix is MIT, like the deck it is built on (see `LICENSE`).
 
 The code is [MIT](LICENSE). The recordings in `records/`, and the records cut from them in `assets/`, keep their own licenses, listed above. _Summer: Presto_ is CC BY-SA 4.0, so its cut is too.

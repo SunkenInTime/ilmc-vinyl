@@ -1,0 +1,7 @@
+# Static site on Cloudflare Workers (assets only, no code): `npm run deploy` builds dist/ and uploads it.
+name = "ilmc-vinyl"
+compatibility_date = "2026-11-01"
+routes = [{ pattern = "ilmc.daracloud.uk", custom_domain = true }]
+
+[assets]
+directory = "./dist"
