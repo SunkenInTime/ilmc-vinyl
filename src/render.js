@@ -15,7 +15,7 @@ const P3 = [ARM_LE - 0.040 * CB, 0.040 * SB, -0.0125];
 const TUBE = G.bezier([0, 0, 0], [0.075 * Math.cos(0.28), 0.075 * Math.sin(0.28), -0.003], [P3[0] - 0.075 * CB, P3[1] + 0.075 * SB, -0.0085], P3, 32);
 const REST_PT = TUBE[20];
 const STROBE = [-0.158, -0.160], LAMP = [STROBE[0] + 0.7026 * 0.024, STROBE[1] + 0.7115 * 0.024, -0.013];
-const NO_LIGHTS = new Float32Array(32), NO_COLS = new Float32Array(24), NO_AMB = new Float32Array(3);   // ILMC screen lights (shaders.js), off
+const NO_LIGHTS = new Float32Array(32), NO_COLS = new Float32Array(24), NO_AMB = new Float32Array(3), NO_V3 = [0, 0, 1];   // ILMC screen lights (shaders.js), off
 const BLACK = [0.012, 0.012, 0.013], CHROME = [0.62, 0.63, 0.66], AMBER = [1.0, 0.55, 0.12];
 
 export class Renderer {
@@ -117,7 +117,7 @@ export class Renderer {
   // orbit camera: st.az (around the deck), st.el (elevation), st.zoom (0 = whole deck, 1 = at the stylus, < 0 = further away)
   camera(st) {
     const c = this.canvas, asp = c.width / c.height, z = st.zoom, zi = Math.max(0, z), [sx, sy] = stylusXY(st.al);
-    let at = st.at || [lerp(0.042, sx, zi), lerp(0, sy, zi), lerp(-0.015, 0, zi)], base = Math.max(0.95, 0.95 * 1.5 / asp);
+    let at = st.at || [lerp(0.042, sx, zi), lerp(0, sy, zi), lerp(-0.015, 0, zi) + (st.rise || 0) * (1 - zi)], base = Math.max(0.95, 0.95 * 1.5 / asp);   // rise: look above the deck (ILMC)
     let dist = st.dist || (z >= 0 ? lerp(base, 0.06, z) : base * Math.exp(-0.9 * z));   // z < 0 pulls back
     const ce = Math.cos(st.el);
     const eye = [at[0] + dist * ce * Math.sin(st.az), at[1] - dist * ce * Math.cos(st.az), at[2] + dist * Math.sin(st.el)];
@@ -126,16 +126,18 @@ export class Renderer {
       const f = G.norm([at[0] - eye[0], at[1] - eye[1], at[2] - eye[2]]), r = G.norm([f[1], -f[0], 0]), u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
       up = u.map((v, i) => v * Math.cos(st.roll) + r[i] * Math.sin(st.roll));
     }
-    const v = G.lookAt(eye, at, up);
-    const proj = G.perspective(FOV, asp, lerp(0.05, 0.004, zi), 150);
-    this.cam = { eye, asp, ...v, proj, vp: G.mul(proj, v.m) };
+    // ILMC's director: a whole pose of its own (st.view = { eye, at, up, fov }), in place of the orbit
+    const D = st.view, fov = D?.fov || FOV, e = D ? D.eye : eye, a = D ? D.at : at;
+    const v = G.lookAt(e, a, D?.up || up);
+    const proj = G.perspective(fov, asp, D ? Math.max(0.004, Math.min(0.05, Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]) * 0.08)) : lerp(0.05, 0.004, zi), 150);
+    this.cam = { eye: e, asp, fov, ...v, proj, vp: G.mul(proj, v.m) };
     return this.cam;
   }
 
   // world (x, y) on the horizontal plane at height z under a pointer position
   pick(clientX, clientY, z = 0) {
     const cam = this.cam; if (!cam) return null;
-    const b = this.canvas.getBoundingClientRect(), t = Math.tan(FOV / 2);
+    const b = this.canvas.getBoundingClientRect(), t = Math.tan((cam.fov || FOV) / 2);
     const nx = ((clientX - b.left) / b.width * 2 - 1) * t * cam.asp, ny = (1 - (clientY - b.top) / b.height * 2) * t;
     const d = [0, 1, 2].map((i) => cam.fwd[i] + nx * cam.right[i] + ny * cam.up[i]);
     if (d[2] >= -1e-6) return null;
@@ -154,11 +156,18 @@ export class Renderer {
     return best;
   }
 
-  // st: { thp, al, zt (stylus height above the disc), zoom, az, el, motor, rpm }
-  draw(st) {
-    const gl = this.gl, c = this.canvas, m = this.m, I = G.ident(), info = this.info, ecc = info ? info.ecc : [0, 0];
-    const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+  // the canvas follows its box on the page; returns its size in device pixels
+  fit() {
+    const c = this.canvas, dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    return [w, h];
+  }
+
+  // st: { thp, al, zt (stylus height above the disc), zoom, az, el, motor, rpm }
+  // ILMC: st.target = { fb, w, h } draws in linear light into the room's HDR picture; st.flash = { pos, col }; st.noFloor
+  draw(st) {
+    const gl = this.gl, m = this.m, I = G.ident(), info = this.info, ecc = info ? info.ecc : [0, 0];
+    let [w, h] = this.fit(); if (st.target) { w = st.target.w; h = st.target.h; }
     const cam = this.camera(st);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.colorMask(true, true, true, true);   // the room (three.js) shares this context
     const spin = G.Rz(-st.thp), discM = G.chain(spin, G.T(ecc[0], ecc[1], 0));
@@ -191,7 +200,7 @@ export class Renderer {
     gl.disable(gl.POLYGON_OFFSET_FILL);
 
     // 2. beauty pass
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, st.target ? st.target.fb : null); gl.viewport(0, 0, w, h);
     if (st.bare) gl.clearColor(0, 0, 0, 1); else gl.clearColor(0.004, 0.004, 0.005, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.tex.shadow);
@@ -199,10 +208,11 @@ export class Renderer {
       gl.uniformMatrix4fv(u.uVP, false, cam.vp); gl.uniformMatrix4fv(u.uLVP, false, this.lvp); gl.uniform3fv(u.uEye, cam.eye);
       gl.uniform1i(u.uShadow, 3); gl.uniform4f(u.uLamp, LAMP[0], LAMP[1], LAMP[2], on);
       gl.uniform4fv(u.uSL, st.lights?.pos || NO_LIGHTS); gl.uniform3fv(u.uSC, st.lights?.col || NO_COLS); gl.uniform3fv(u.uAmb, st.lights?.amb || NO_AMB); gl.uniform1f(u.uKeyK, st.lights?.key ?? 1);
+      gl.uniform3fv(u.uFlP, st.flash?.pos || NO_V3); gl.uniform3fv(u.uFlC, st.flash?.col || NO_AMB); gl.uniform1f(u.uLin, st.target ? 1 : 0);
     };
     let u = this.std.u;
     gl.useProgram(this.std.p); common(u); gl.uniform2f(u.uPivot, PIVOT_X, PIVOT_Y);
-    for (const [mesh, M, col, rough, metal, mode, emis] of st.bare ? items.slice(1) : items) {      // bare: no table under the deck
+    for (const [mesh, M, col, rough, metal, mode, emis] of st.bare || st.noFloor ? items.slice(1) : items) {      // bare: no table under the deck (the room brings its own floor)
       gl.uniformMatrix4fv(u.uM, false, M); gl.uniform3fv(u.uCol, col); gl.uniform3fv(u.uEmis, emis);
       gl.uniform1f(u.uRough, rough); gl.uniform1f(u.uMetal, metal); gl.uniform1i(u.uMode, mode);
       gl.bindVertexArray(mesh.vao); gl.drawArrays(gl.TRIANGLES, 0, mesh.count);

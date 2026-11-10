@@ -6,3 +6,4 @@ tmp
 assets/.building
 *.tmp
 .env*
+.wrangler

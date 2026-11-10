@@ -4,37 +4,46 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>I Love My Computer</title>
-<meta name="description" content="A fan remix of a record player simulated from the groove up, for Ninajirachi's I Love My Computer. Bring your own copy of Fuck My Computer: it is cut into a groove in your browser and a simulated stylus plays it back.">
+<meta name="description" content="A record player simulated from the groove up, remixed for Ninajirachi's I Love My Computer. Bring your own copy of Fuck My Computer: your browser cuts it into a record, and a room of old computers performs it.">
+<meta name="theme-color" content="#030304">
+<meta property="og:site_name" content="I Love My Computer">
 <meta property="og:title" content="I Love My Computer">
-<meta property="og:description" content="Bring your own copy of Fuck My Computer. It is cut into a groove in your browser, a simulated stylus plays it back, and a room of old computers loses its mind.">
+<meta property="og:description" content="Bring your own copy of Fuck My Computer. Your browser cuts it into a record, a simulated stylus plays it, and a room of old computers loses its mind.">
 <meta property="og:image" content="https://ilmc.daracloud.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A turntable on a floor buried in old computers">
 <meta property="og:url" content="https://ilmc.daracloud.uk/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="I Love My Computer">
+<meta name="twitter:description" content="Bring your own copy of Fuck My Computer. Your browser cuts it into a record, and a room of old computers performs it.">
 <meta name="twitter:image" content="https://ilmc.daracloud.uk/og.png">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M14 18Q4 18 9 27L44 86Q50 95 56 86L91 27Q96 18 86 18Z' fill='%23d8dce6' stroke='%23fff' stroke-width='3'/%3E%3Crect x='30' y='30' width='10' height='17' rx='2.5' fill='%23121318'/%3E%3Crect x='60' y='30' width='10' height='17' rx='2.5' fill='%23121318'/%3E%3Cpath d='M38 56a6 6 0 0 0 12 0a6 6 0 0 0 12 0' fill='none' stroke='%23121318' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 <script>
-// Start downloading and decoding the opening record now, before any module has even been requested.
 (function () {
-  // phones get a short record first: a long side needs several hundred MB of memory once decoded
-  var small = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
-  var id = 'mountain-king', dir = 'assets/' + id + '/', b = window.__boot = { id: id, dir: dir, got: 0, total: 0 };
-  b.man = fetch(dir + 'record.json').then(function (r) { if (!r.ok) throw new Error('no precompiled record'); return r.json(); });
-  b.vis = fetch(dir + 'record.vis').then(function (r) { if (!r.ok) throw new Error('no precompiled record'); return r.arrayBuffer(); });
-  b.audio = fetch(dir + 'record.flac').then(function (r) {
-    if (!r.ok) throw new Error('no precompiled record');
-    b.total = +r.headers.get('content-length') || 0;
-    if (!r.body) return r.arrayBuffer();
-    var reader = r.body.getReader(), chunks = [];
-    return (function pump() {
-      return reader.read().then(function (x) { if (x.done) return new Blob(chunks).arrayBuffer(); chunks.push(x.value); b.got += x.value.length; return pump(); });
-    })();
-  }).then(function (buf) { return new OfflineAudioContext(2, 1, 48000).decodeAudioData(buf); });
-  b.man.catch(function () {}); b.vis.catch(function () {}); b.audio.catch(function () {});
+  // window.__private: a precut copy of the song that a private dev server lays over the site (never in the repo or the
+  // public build). It starts downloading now, before any module has been requested. The public page downloads no
+  // record at all until the visitor asks for one: the first thing it shows is the room and the Insert disc window.
+  var P = window.__private;
+  if (P) {
+    var b = window.__boot = { id: P.id, dir: P.dir, got: 0, total: 0 };
+    b.man = fetch(P.dir + 'record.json').then(function (r) { if (!r.ok) throw new Error('no precompiled record'); return r.json(); });
+    b.vis = fetch(P.dir + 'record.vis').then(function (r) { if (!r.ok) throw new Error('no precompiled record'); return r.arrayBuffer(); });
+    b.audio = fetch(P.dir + 'record.flac').then(function (r) {
+      if (!r.ok) throw new Error('no precompiled record');
+      b.total = +r.headers.get('content-length') || 0;
+      if (!r.body) return r.arrayBuffer();
+      var reader = r.body.getReader(), chunks = [];
+      return (function pump() {
+        return reader.read().then(function (x) { if (x.done) return new Blob(chunks).arrayBuffer(); chunks.push(x.value); b.got += x.value.length; return pump(); });
+      })();
+    }).then(function (buf) { return new OfflineAudioContext(2, 1, 48000).decodeAudioData(buf); });
+    b.man.catch(function () {}); b.vis.catch(function () {}); b.audio.catch(function () {});
+    b.t0 = performance.now(); window.__load = b;
+  }
   // Progress bar. window.__load is whatever is loading right now: { got, total, done }. It is driven from
   // here so it moves before the modules have loaded; it only appears if a load takes more than 300 ms.
-  b.t0 = performance.now(); window.__load = b;
   var root = document.documentElement;
   (function frame() {
     var h = window.__load, el = document.getElementById('loader');
@@ -60,266 +69,453 @@
 <link rel="modulepreload" href="src/records.js"><link rel="modulepreload" href="src/label.js"><link rel="modulepreload" href="src/press.js">
 <link rel="modulepreload" href="src/worklet.js"><link rel="modulepreload" href="src/engine.js"><link rel="modulepreload" href="src/engine-core.js"><link rel="modulepreload" href="src/groove.js">
 <style>
-  :root { --fg: #e8e4dd; --soft: #c4c0b9; --dim: #85817a; --line: rgba(255,255,255,.1); --panel: rgba(12,12,13,.78); --acc: #ffe10a; --cap0: #0a246a; --cap1: #a6caf0; --sys: 'Courier New', Courier, monospace; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  :root {
+    --fg: #ece8e1; --soft: #c9c5be; --dim: #96928b; --acc: #ffe10a;
+    --glass: rgba(9,9,11,.66); --line: rgba(255,255,255,.12);
+    /* the "System message" window from her video: Windows 2000 classic chrome, on her lighter, warmer face */
+    --face: #e9e7df; --hi: #fff; --lt: #f4f3ee; --lo: #a3a199; --dk: #1e1e1e; --sel: #0a246a; --cap0: #0a246a; --cap1: #a6caf0;
+    --raised: inset -1px -1px var(--dk), inset 1px 1px var(--lt), inset -2px -2px var(--lo), inset 2px 2px var(--hi);
+    --pressed: inset -1px -1px var(--hi), inset 1px 1px var(--dk), inset -2px -2px var(--lt), inset 2px 2px var(--lo);
+    --sunken: inset -1px -1px var(--hi), inset 1px 1px var(--lo), inset -2px -2px var(--lt), inset 2px 2px var(--dk);
+    --sys: "Courier New", Courier, monospace;
+    --ui: Tahoma, Verdana, "Segoe UI", "DejaVu Sans", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, Menlo, monospace;
+    --st: env(safe-area-inset-top, 0px); --sr: env(safe-area-inset-right, 0px); --sb: env(safe-area-inset-bottom, 0px); --sl: env(safe-area-inset-left, 0px);
+    --gut: 16px; --tph: 62px;      /* the transport's height: what sits above it clears it */
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #030304; color: var(--fg); font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  html, body { margin: 0; height: 100%; background: #030304; color: var(--fg); font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; overflow: hidden; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 1px dotted currentColor; outline-offset: 2px; }
   #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; opacity: 0; transition: opacity .55s ease-out; }
   .ready #gl { opacity: 1; }
-  /* progress bar for whatever record is loading (driven by the inline script in <head>) */
-  #loader { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 7; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 18px 10px; border-radius: 10px; opacity: 0; transition: opacity .25s; pointer-events: none; color: var(--dim); font: 10px var(--mono); }
+  #words { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+  .og, .og body { background: #000; }
+  .og body > :not(#gl) { display: none !important; }      /* ?og: only the render, for the share image */
+  .og #words, .plain #words { display: none; }
+
+  /* progress bar for a record that is downloading (driven by the inline script in <head>) */
+  #loader { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 7; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 18px 10px; border-radius: 4px; opacity: 0; transition: opacity .25s; pointer-events: none; color: var(--soft); font: 10px var(--mono); }
   .loading #loader { opacity: 1; }
-  .ready #loader { background: rgba(8,8,9,.72); backdrop-filter: blur(10px); }   /* over the deck, when changing records */
-  #loader .bar { width: 150px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.13); overflow: hidden; }
-  #loader-fill { display: block; width: 0; height: 100%; border-radius: 2px; background: var(--soft); }
+  .ready #loader { background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  .cutting #loader { display: none; }                         /* the Insert disc window shows its own progress */
+  #loader .bar { width: 150px; height: 2px; background: rgba(255,255,255,.15); overflow: hidden; }
+  #loader-fill { display: block; width: 0; height: 100%; background: var(--fg); }
   #loader.wait #loader-fill { width: 34% !important; animation: slide 1.05s ease-in-out infinite; }   /* size unknown, or finishing up */
   @keyframes slide { from { transform: translateX(-110%); } to { transform: translateX(305%); } }
   #loader-pct { min-height: 12px; }
-  .og, .og body { background: #000; }
-  .og body > :not(#gl) { display: none !important; }      /* ?og: only the render, for the share image */
-  #vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 46%, transparent 42%, rgba(0,0,0,.6) 100%); }
-  #words { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
-  /* I Love My Computer: the logo is the face from the Fuck My Computer video */
-  #logo { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-  #logo svg { width: 46px; height: 46px; flex: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)) drop-shadow(0 0 14px rgba(160,200,255,.18)); }
-  #logo b { display: block; font: 900 19px/1 Orbitron, 'Arial Black', sans-serif; letter-spacing: .04em; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,.55), 0 0 2px #fff; }
-  #logo span { display: block; margin-top: 4px; font: italic 700 13px/1 'Times New Roman', Times, serif; color: #ffe10a; letter-spacing: .02em; text-shadow: 0 0 1px #000, 0 1px 2px #000; }
-  .og #words, .plain #words { display: none; }
 
-  #teaser { position: fixed; top: 16px; left: 18px; max-width: 290px; z-index: 6; }
-  #teaser p { margin: 0; color: var(--dim); max-width: 270px; }
-  .link { all: unset; cursor: pointer; color: var(--fg); border-bottom: 1px solid rgba(255,255,255,.3); }
-  .link:hover { border-color: var(--fg); }
-  #toggles { position: fixed; top: 12px; right: 14px; display: flex; gap: 2px; z-index: 6; }
-  #toggles button { all: unset; cursor: pointer; padding: 5px 10px; border-radius: 999px; color: var(--dim); }
-  #toggles button:hover { color: var(--fg); }
+  /* ---------- quiet chrome over the picture: dark glass, so it reads over the dark room and the bright skies ---------- */
+  .chrome { transition: opacity .6s ease; }
+  .idle .chrome, .bare .chrome, .bare #hud { opacity: 0 !important; pointer-events: none !important; }
+  .idle #gl, .bare #gl { cursor: none; }
+  .plate { background: var(--glass); backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); border: 1px solid var(--line); border-radius: 4px; }
+  .started #teaser, .started #toggles, .started #tp, .browse #tp { opacity: 1; }
+  #teaser, #toggles, #tp { opacity: 0; }
+  .ready #teaser, .ready #toggles { opacity: 1; }
+
+  /* top left: the mark, and the way to the About page */
+  #teaser { position: fixed; top: calc(var(--gut) + var(--st)); left: calc(var(--gut) + var(--sl)); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 8px; }
+  #teaser svg { width: 30px; height: 30px; flex: none; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+  #teaser b { display: block; font: 400 11px/1.1 "Times New Roman", Times, serif; letter-spacing: .2em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+  #teaser .line { display: block; margin-top: 3px; color: var(--dim); font-size: 11px; white-space: nowrap; }
+  .link { all: unset; cursor: pointer; color: var(--soft); text-decoration: underline; text-decoration-color: rgba(255,255,255,.3); text-underline-offset: 2px; }
+  .link:hover { color: var(--fg); text-decoration-color: var(--fg); }
+  .link:focus-visible { outline: 1px dotted currentColor; outline-offset: 2px; }
+
+  /* top right */
+  #toggles { position: fixed; top: calc(var(--gut) + var(--st)); right: calc(var(--gut) + var(--sr)); display: flex; gap: 2px; padding: 3px; z-index: 6; }
+  #toggles button { all: unset; cursor: pointer; padding: 5px 10px; border-radius: 2px; color: var(--soft); white-space: nowrap; }
+  #toggles button:hover { color: #fff; background: rgba(255,255,255,.07); }
+  #toggles button:focus-visible { outline: 1px dotted #fff; outline-offset: -3px; }
   #toggles button[hidden] { display: none; }
-  #credit { position: fixed; right: 24px; bottom: 13px; z-index: 6; display: flex; gap: 20px; align-items: baseline; color: var(--dim); }   /* same size and spacing as the top-right labels */
-  #credit a { color: inherit; text-decoration: none; }
-  #credit .remix em { font: italic 12.5px 'Times New Roman', Times, serif; color: var(--soft); letter-spacing: .01em; }
-  #credit .remix a { color: var(--fg); }
-  #credit a:hover, #t-reset:hover { color: var(--fg); }
-  #t-reset { all: unset; cursor: pointer; }
-  #t-reset[hidden] { display: none; }
-  #toggles button[aria-pressed=true] { color: var(--fg); background: rgba(255,255,255,.09); }
-  #foot { position: fixed; left: 18px; bottom: 14px; display: flex; gap: 14px; color: var(--dim); font-variant-numeric: tabular-nums; pointer-events: none; }
-  /* Records toggle doubles as "now playing": level bars that move while a track plays, the title, the time */
-  #toggles #t-records { display: inline-flex; align-items: center; gap: 8px; max-width: 360px; }
-  #now-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #now-time { color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  #now-time:empty { display: none; }
-  .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; flex: none; }
-  .eq i { width: 2px; height: 100%; border-radius: 1px; background: currentColor; transform: scaleY(.25); transform-origin: bottom; transition: transform .4s; }
-  #t-records.playing .eq { color: var(--acc); }
-  #t-records.playing .eq i { animation: eq .9s ease-in-out infinite alternate; }
-  #t-records.playing .eq i:nth-child(2) { animation-duration: 1.15s; animation-delay: -.5s; }
-  #t-records.playing .eq i:nth-child(3) { animation-duration: .7s; animation-delay: -.2s; }
-  #t-records.playing .eq i:nth-child(4) { animation-duration: 1s; animation-delay: -.8s; }
-  @keyframes eq { 0% { transform: scaleY(.2); } 45% { transform: scaleY(1); } 100% { transform: scaleY(.45); } }
-  @media (prefers-reduced-motion: reduce) { #t-records.playing .eq i { animation: none; transform: scaleY(.7); } }
+  #toggles button[aria-pressed=true] { color: #fff; background: rgba(255,255,255,.12); }
+  #t-flash::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; background: var(--dim); }
+  #t-flash[aria-pressed=true]::before { background: var(--acc); }
 
-  .panel { position: fixed; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(16px); padding: 14px; z-index: 4; }
-  #ctl { top: 46px; right: 14px; width: 236px; max-height: calc(100% - 86px); overflow: auto; }
-  #hud { left: 16px; bottom: 40px; width: 292px; padding: 0 0 9px; opacity: 0; pointer-events: none; transition: opacity .5s; border-radius: 3px; overflow: hidden;
-    border: 1px solid rgba(255,255,255,.14); box-shadow: inset 1px 1px 0 rgba(255,255,255,.08), 0 6px 24px rgba(0,0,0,.45); }
-  #hud .cap { display: flex; align-items: center; justify-content: space-between; height: 17px; padding: 0 3px 0 7px; margin-bottom: 8px;
-    background: linear-gradient(90deg, rgba(10,36,106,.92), rgba(166,202,240,.55)); color: #fff; font: bold 10.5px/17px var(--sys); letter-spacing: .02em; }
-  #hud .cap i { width: 11px; height: 11px; border: 1px solid rgba(255,255,255,.55); border-radius: 1px; display: grid; place-items: center; font: 9px/1 Arial, sans-serif; font-style: normal; color: rgba(255,255,255,.8); }
-  #hud > :not(.cap) { margin-left: 9px; margin-right: 9px; }
-  #hud.on { opacity: 1; }   /* only while the needle is on the record */
-  h2 { font-size: 10px; margin: 14px 0 6px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; font-weight: 500; }
-  h2:first-child { margin-top: 0; }
-  .row { display: flex; gap: 6px; align-items: center; margin: 5px 0; }
-  .row label { flex: 0 0 76px; color: var(--dim); }
-  .row output { flex: 0 0 34px; text-align: right; font: 11px var(--mono); color: var(--soft); }
-  input[type=range] { flex: 1; min-width: 0; accent-color: var(--acc); height: 14px; }
-  #ctl button, select, .file { font: inherit; color: var(--fg); background: rgba(255,255,255,.06); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; cursor: pointer; flex: 1; text-align: center; }
-  #ctl button:hover, .file:hover { background: rgba(255,255,255,.12); }
-  #ctl button.on { background: var(--acc); color: #1a1206; border-color: transparent; }
-  #shelf { top: 46px; right: 14px; width: 268px; max-height: calc(100% - 62px); overflow: auto; padding: 8px; }
-  #shelf button { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; padding: 6px 8px; border-radius: 7px; cursor: pointer; }
-  #shelf button:hover, #shelf button:focus-visible { background: rgba(255,255,255,.07); }
-  #shelf button b { font-weight: 400; } #shelf button span { color: var(--dim); white-space: nowrap; }
-  #shelf button[aria-current=true] b { color: var(--acc); }
-  #shelf p { margin: 8px 8px 4px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--dim); font-size: 11px; }
-  #shelf a { color: var(--soft); }
-  #scope { width: calc(100% - 18px); height: 62px; display: block; border-radius: 1px; box-shadow: inset 1px 1px 0 rgba(0,0,0,.6), inset -1px -1px 0 rgba(255,255,255,.07); }
-  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 12px; margin-top: 8px; font: 10.5px/1.45 var(--sys); }
-  #stats span { color: var(--dim); } #stats b { font-weight: 400; float: right; color: var(--soft); }
+  /* ---------- bottom: the transport ---------- */
+  #tp { position: fixed; left: 50%; bottom: calc(var(--gut) + var(--sb)); transform: translateX(-50%); width: min(600px, calc(100vw - 2 * var(--gut) - var(--sl) - var(--sr))); z-index: 6; padding: 2px 6px 4px; user-select: none; -webkit-user-select: none; }
+  .started #tp:not([hidden]) { display: block; }
+  #tl { display: block; width: 100%; height: 22px; cursor: pointer; touch-action: none; }
+  #tl:focus-visible { outline: 1px dotted #fff; outline-offset: 0; }
+  #tp .row { display: flex; align-items: center; gap: 6px; height: 28px; }
+  #tp .ib { all: unset; cursor: pointer; flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 2px; color: var(--fg); }
+  #tp .ib:hover { background: rgba(255,255,255,.09); color: #fff; }
+  #tp .ib:focus-visible { outline: 1px dotted #fff; outline-offset: -3px; }
+  #tp .ib[hidden] { display: none; }
+  #tp .ib svg { width: 14px; height: 14px; fill: currentColor; shape-rendering: crispEdges; }
+  #tp-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+  #tp-title i { font-style: normal; color: var(--dim); }
+  #tp-time { flex: none; color: var(--soft); font: 11px var(--mono); font-variant-numeric: tabular-nums; }
+  #tp-tip { position: absolute; bottom: calc(100% + 6px); left: 0; transform: translateX(-50%); padding: 2px 6px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: #ffffe1; color: #000; font: 11px var(--ui); box-shadow: 0 0 0 1px #000; }    /* a classic tooltip */
+  #tp-tip.on { opacity: 1; }
+  #tp.nodisc #tl, #tp.nodisc #tp-time, #tp.nodisc #tp-play { display: none; }
+  #tp.nodisc .row { height: 30px; }
+  #tp:not(.nodisc) #tp-insert { display: none; }
+  #tp-insert { all: unset; cursor: pointer; padding: 3px 10px; border-radius: 2px; color: #1a1406; background: var(--acc); font-weight: 600; }
+  #status { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--gut) + var(--sb) + var(--tph) + 6px); z-index: 6; max-width: calc(100vw - 32px); color: var(--soft); text-shadow: 0 1px 3px #000, 0 0 8px rgba(0,0,0,.8); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bare-hint { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; padding: 8px 14px; pointer-events: none; opacity: 0; transition: opacity .4s; }
+  .bare-hint.on { opacity: 1; }
 
-  /* only the pill takes clicks: the scene under the overlay can be dragged and zoomed, and tapping it also powers on */
-  #power { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.28); z-index: 5; opacity: 0; pointer-events: none; transition: opacity .4s ease-out .25s; }
+  /* ---------- the windows ---------- */
+  .win { background: var(--face); color: #000; font: 11px/1.4 var(--ui); padding: 3px; border: 0; border-radius: 0; box-shadow: var(--raised), 0 12px 40px rgba(0,0,0,.45); -webkit-font-smoothing: auto; }
+  .win .cap { display: flex; align-items: center; justify-content: space-between; gap: 6px; height: 18px; padding: 0 2px 0 4px; background: linear-gradient(90deg, var(--cap0), var(--cap1)); color: #fff; font: bold 12px/18px var(--sys); letter-spacing: 0; user-select: none; -webkit-user-select: none; white-space: nowrap; overflow: hidden; }
+  .win .cap span { overflow: hidden; text-overflow: ellipsis; }
+  .win .x { all: unset; flex: none; box-sizing: border-box; width: 16px; height: 14px; display: grid; place-items: center; background: var(--face); box-shadow: var(--raised); cursor: pointer; }
+  .win .x:active { box-shadow: var(--pressed); }
+  .win .x:active svg { transform: translate(1px, 1px); }
+  .win .x:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+  .win .x svg { width: 8px; height: 7px; shape-rendering: crispEdges; }
+  .win .wb { padding: 12px 12px 11px; }
+  .win p { margin: 0 0 8px; }
+  .win a { color: #00007b; }
+  .btn { all: unset; position: relative; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: 75px; height: 23px; padding: 0 12px; background: var(--face); color: #000; font: 11px var(--ui); white-space: nowrap; box-shadow: var(--raised); cursor: pointer; text-decoration: none; }
+  .btn:active { box-shadow: var(--pressed); padding-top: 1px; padding-left: 13px; padding-right: 11px; }
+  .btn.def { box-shadow: 0 0 0 1px #000, var(--raised); }
+  .btn.def:active { box-shadow: 0 0 0 1px #000, inset 0 0 0 1px var(--lo); }
+  .btn:focus-visible::after, .win:not(:focus-within) .btn.def::after, .btn.def:focus::after { content: ''; position: absolute; inset: 4px; outline: 1px dotted #000; }
+  .btn:focus-visible { outline: none; }
+  .btn[disabled] { color: var(--lo); text-shadow: 1px 1px #fff; cursor: default; }
+  .btns { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .field { background: #fff; box-shadow: var(--sunken); padding: 2px; }
+  hr.etch { border: 0; height: 2px; margin: 10px 0; box-shadow: inset 0 1px var(--lo), inset 0 -1px var(--hi); }
+  .chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .chk input { appearance: none; -webkit-appearance: none; margin: 0; flex: none; width: 13px; height: 13px; background: #fff center / 7px 7px no-repeat; box-shadow: var(--sunken); cursor: pointer; }
+  .chk input:checked { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath d='M6 0h1v3h-1v1h-1v1h-1v1h-1v1h-1v-1h-1v-1h-1v-3h1v1h1v1h1v-1h1v-1h1v-1h1z'/%3E%3C/svg%3E"); }
+  .chk input:focus-visible { outline: none; }
+  .chk input:focus-visible + span { outline: 1px dotted #000; outline-offset: 1px; }
+  .ico { flex: none; width: 32px; height: 32px; shape-rendering: crispEdges; }
+  /* a classic progress bar: navy blocks in a sunken trough */
+  .prog { height: 18px; padding: 3px; background: var(--face); box-shadow: inset -1px -1px var(--hi), inset 1px 1px var(--lo); }
+  .prog i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--sel) 0 8px, transparent 8px 10px); transition: width .25s linear; }
+
+  /* the Insert disc window, and the dim layer under it before the music starts */
+  #power { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.3); z-index: 5; opacity: 0; pointer-events: none; transition: opacity .4s ease-out .2s; }
   .ready #power { opacity: 1; }
+  .started #power { display: none; }
   .ready #power-msg { pointer-events: auto; cursor: pointer; }
-  .ready #power.busy #power-msg { cursor: progress; }
-  #power.busy #power-msg::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: -1px; border: 1.5px solid rgba(255,255,255,.22); border-top-color: var(--fg); border-radius: 50%; animation: spin .8s linear infinite; }
+  .powering #power-msg { cursor: progress; }
+  #power-msg { display: none; padding: 7px 16px; color: var(--fg); }
+  .powering #power-msg { display: block; }
+  .powering #power-msg::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 10px; vertical-align: -1px; border: 1.5px solid rgba(255,255,255,.22); border-top-color: var(--fg); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  #power-msg { display: none; padding: 9px 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); backdrop-filter: blur(10px); letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
-
-  /* windows: a quiet Windows 2000 title bar on the dark glass panels */
-  .cap { display: flex; align-items: center; justify-content: space-between; height: 17px; padding: 0 3px 0 7px;
-    background: linear-gradient(90deg, rgba(10,36,106,.92), rgba(166,202,240,.55)); color: #fff; font: bold 10.5px/17px var(--sys); letter-spacing: .02em; user-select: none; }
-  .cap i { width: 11px; height: 11px; border: 1px solid rgba(255,255,255,.55); border-radius: 1px; display: grid; place-items: center; font: 9px/1 Arial, sans-serif; font-style: normal; color: rgba(255,255,255,.8); }
-  .cap button { all: unset; cursor: pointer; width: 11px; height: 11px; border: 1px solid rgba(255,255,255,.55); border-radius: 1px; display: grid; place-items: center; font: 9px/1 Arial, sans-serif; color: rgba(255,255,255,.8); }
-  .cap button:hover { background: rgba(255,255,255,.15); }
-  #ctl > .cap { margin: -14px -14px 12px; } #shelf > .cap { margin: -8px -8px 6px; }
-  #ctl, #shelf { border-radius: 3px; }
-  /* the insert-disc window */
-  #insert { width: min(392px, calc(100vw - 32px)); background: rgba(13,15,22,.9); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.14); border-radius: 3px;
-    box-shadow: inset 1px 1px 0 rgba(255,255,255,.08), 0 18px 60px rgba(0,0,0,.55); opacity: 0; transform: translateY(6px) scale(.985); transition: opacity .35s .2s, transform .35s .2s; }
-  .ready #insert { opacity: 1; transform: none; pointer-events: auto; }
-  #power.busy #insert { display: none; }
-  #insert .body { display: flex; gap: 16px; align-items: flex-start; padding: 18px 18px 6px; }
-  #insert .txt { flex: 1; min-width: 0; }
-  #insert p { margin: 0 0 10px; color: var(--soft); font-size: 12.5px; line-height: 1.5; }
-  #insert p b { color: var(--fg); font-weight: 600; } #insert p i { font-family: 'Times New Roman', Times, serif; font-size: 14px; color: var(--fg); }
-  #insert .fine { color: var(--dim); font-size: 11.5px; }
-  #insert .err { color: #ff8a7a; }
-  #insert .btns { display: flex; gap: 8px; padding: 4px 18px 0; }
-  #insert .btns > * { all: unset; box-sizing: border-box; flex: 1; text-align: center; cursor: pointer; padding: 8px 10px; border-radius: 2px; font: 12px/1.2 system-ui, sans-serif;
-    color: var(--fg); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); }
-  #insert .btns > *:hover { background: rgba(255,255,255,.12); }
-  #insert .btns > .def { background: #ecebe5; color: #111; border-color: #fff; box-shadow: 0 0 0 1px #000 inset; font-weight: 600; }
-  #insert .btns > .def:hover { background: #fff; }
-  #insert .fmt { margin: 12px 18px 0; font: 10px/1.4 var(--sys); color: var(--dim); letter-spacing: .03em; }
-  #insert .alt { margin: 6px 18px 14px; }
-  #insert .alt .link { color: var(--dim); border-color: rgba(255,255,255,.15); font-size: 11.5px; }
+  .dlg { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; width: min(400px, calc(100vw - 24px - var(--sl) - var(--sr))); max-height: calc(100% - 24px - var(--st) - var(--sb)); overflow: auto; }
+  /* the window is on screen from the first paint: the room takes a moment longer to draw the first time, and fades in behind it */
+  .powering #insert, #insert[hidden], .started #insert:not(.open) { display: none; }
+  #insert .top { display: flex; gap: 12px; align-items: flex-start; }
+  #insert .txt { flex: 1; min-width: 0; padding-top: 1px; }
+  #insert .txt p { font-size: 12px; }
+  #insert .txt b { font-weight: bold; }
+  #insert .txt i { font-family: "Times New Roman", Times, serif; font-size: 14px; }
+  #insert .fine, .win .fine { color: #4a4943; }
+  #insert .err { color: #a00000; }
+  #insert .btns { margin-top: 12px; }
   #insert [data-show] { display: none; }
-  #insert[data-state=idle] [data-show~=idle], #insert[data-state=error] [data-show~=error], #insert[data-state=cutting] [data-show~=cutting], #insert[data-state=ready] [data-show~=ready] { display: block; }
+  #insert[data-state=idle] [data-show~=idle], #insert[data-state=error] [data-show~=error], #insert[data-state=cutting] [data-show~=cutting], #insert[data-state=ready] [data-show~=ready], #insert[data-state=loading] [data-show~=loading] { display: block; }
   #insert[data-state=idle] .btns[data-show~=idle], #insert[data-state=error] .btns[data-show~=error], #insert[data-state=ready] .btns[data-show~=ready] { display: flex; }
-  /* a CD, spinning while it is being cut */
-  #insert .cd { flex: none; width: 58px; height: 58px; border-radius: 50%; margin-top: 2px;
-    background: radial-gradient(circle, #0d0f16 0 5px, #d9dbe2 6px 9px, transparent 10px), conic-gradient(from 20deg, #cfd6e6, #f3d9ef, #cdeff3, #f2efc9, #d9cff3, #cfd6e6);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 2px 10px rgba(0,0,0,.5); }
+  #insert .prog { margin-top: 10px; }
+  #insert .warn { display: flex; gap: 10px; align-items: flex-start; }
+  #insert .warn .ico { width: 24px; height: 24px; margin-top: 1px; }
+  #insert .warn p { margin: 0 0 6px; }
+  #insert .alt { margin: 8px 0 0; color: #4a4943; }
+  #insert .alt .link { color: #00007b; text-decoration-color: rgba(0,0,123,.35); }
+  #insert .alt .link:focus-visible { outline-color: #000; }
+  .started #insert .warn, .started #insert .alt, .started #insert hr.etch { display: none !important; }
+  /* the disc: a CD while it is being cut, the visitor's own album art once it is ready (if the file has some) */
+  #insert .cd { flex: none; width: 48px; height: 48px; border-radius: 50%; margin: 1px 2px 0 0;
+    background: radial-gradient(circle, var(--face) 0 4px, #8c8a84 4.5px 5.5px, #d9dbe2 6px 9px, #9a9894 9.5px 10px, transparent 10.5px), conic-gradient(from 20deg, #cfd6e6, #f3d9ef, #cdeff3, #f2efc9, #d9cff3, #cfd6e6);
+    box-shadow: inset 0 0 0 1px #8c8a84; }
   #insert[data-state=cutting] .cd { animation: spin .7s linear infinite; }
-  #insert[data-state=ready] .cd { animation: spin 3.6s linear infinite; }
+  #insert .cover { display: none; flex: none; width: 52px; height: 52px; padding: 2px; box-shadow: var(--sunken); background: #fff; }
+  #insert .cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  #insert.has-art[data-state=ready] .cover { display: block; }
+  #insert.has-art[data-state=ready] .cd { display: none; }
+  @media (prefers-reduced-motion: reduce) { #insert[data-state=cutting] .cd { animation-duration: 3s; } }
+  /* the end of the record */
+  #end { width: min(320px, calc(100vw - 24px)); }
+  #end[hidden] { display: none; }
+  #end .top { display: flex; gap: 12px; align-items: flex-start; }
+  #end .btns { margin-top: 12px; }
+
   /* dragging a file over the page */
-  #drop { position: fixed; inset: 10px; z-index: 9; border: 2px dashed rgba(255,225,10,.7); border-radius: 6px; background: rgba(8,9,14,.55); display: none; place-items: center; pointer-events: none;
-    font: bold 13px var(--sys); color: var(--acc); letter-spacing: .06em; }
+  #drop { position: fixed; inset: 10px; z-index: 9; border: 2px dashed rgba(255,225,10,.75); background: rgba(8,9,14,.5); display: none; place-items: center; pointer-events: none;
+    font: bold 13px var(--sys); color: var(--acc); }
   .dragging #drop { display: grid; }
-  #shelf .insert { color: var(--acc); }
-  dialog { background: rgba(15,15,16,.97); color: var(--fg); border: 1px solid var(--line); border-radius: 14px; padding: 28px 30px 22px; max-width: 540px; width: calc(100% - 40px); max-height: calc(100% - 40px); overflow: auto; font-size: 13px; line-height: 1.58; }
-  dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(3px); }
-  dialog h3 { font-size: 18px; margin: 0 0 14px; font-weight: 600; letter-spacing: -.01em; }
-  dialog p, dialog ul { margin: 0 0 12px; color: var(--soft); }
-  dialog ul { padding-left: 18px; } dialog li { margin: 5px 0; }
-  dialog .fine { color: var(--dim); font-size: 12px; }
-  dialog strong { color: var(--fg); font-weight: 600; }
-  dialog a { color: inherit; text-decoration: underline; text-decoration-color: var(--dim); text-underline-offset: 2px; }
-  dialog a:hover { color: var(--fg); text-decoration-color: var(--fg); }
-  dialog code { font: 11.5px var(--mono); color: var(--fg); }
-  dialog form { margin: 18px 0 0; text-align: right; }
-  dialog form button { font: inherit; color: var(--fg); background: rgba(255,255,255,.08); border: 1px solid var(--line); border-radius: 999px; padding: 6px 16px; cursor: pointer; }
-  @media (max-width: 900px) { #teaser { max-width: 210px; } }
-  @media (max-width: 640px) {                      /* phones: track line on its own row above the credits */
-    #teaser { max-width: calc(100% - 36px); top: calc(14px + env(safe-area-inset-top)); }
-    #toggles { top: calc(52px + env(safe-area-inset-top)); }   /* own row under the teaser: room for what's playing */
-    #credit { bottom: calc(12px + env(safe-area-inset-bottom)); }
-    #foot { right: 18px; bottom: calc(32px + env(safe-area-inset-bottom)); }
-    #toggles #t-records { max-width: calc(100vw - 120px); }
-    #hud { width: min(272px, calc(100% - 32px)); padding: 7px; bottom: calc(56px + env(safe-area-inset-bottom)); }
-    #scope { height: 40px; }
-    #stats { font-size: 9px; gap: 0 10px; margin-top: 5px; }
-    #ctl, #shelf { width: min(236px, calc(100% - 28px)); top: calc(88px + env(safe-area-inset-top)); max-height: calc(100% - 164px); }
-    #ctl { padding: 9px 10px; font-size: 11px; }          /* compact: leave most of the deck visible */
-    #ctl h2 { margin: 9px 0 3px; font-size: 9px; }
-    #ctl .row { margin: 3px 0; gap: 5px; }
-    #ctl .row label { flex-basis: 62px; }
-    #ctl .row output { flex-basis: 30px; font-size: 10px; }
-    #ctl button, #ctl select, #ctl .file { padding: 3px 6px; border-radius: 6px; }
+
+  /* ---------- groove.exe: the stylus in its groove, and the numbers ---------- */
+  #hud { position: fixed; left: calc(var(--gut) + var(--sl)); bottom: calc(var(--gut) + var(--sb)); width: 280px; z-index: 4; opacity: 0; pointer-events: none; transition: opacity .5s; }
+  #hud.on { opacity: 1; pointer-events: auto; }   /* only while the needle is on the record */
+  #hud[hidden] { display: none; }
+  #hud .wb { padding: 4px 4px 5px; }
+  #hud .well { padding: 2px; background: #000; box-shadow: var(--sunken); }
+  #scope { width: 100%; height: 58px; display: block; }
+  #stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin: 5px 3px 0; font: 11px/1.5 var(--ui); font-variant-numeric: tabular-nums; }
+  #stats span { color: #4a4943; } #stats b { font-weight: 400; float: right; color: #000; }
+
+  /* ---------- Controls and Records ---------- */
+  .side { position: fixed; top: calc(var(--gut) + var(--st) + 40px); right: calc(var(--gut) + var(--sr)); z-index: 7; max-height: calc(100% - var(--st) - var(--sb) - 140px); display: flex; flex-direction: column; }
+  .side[hidden] { display: none; }
+  .side .wb { overflow: auto; min-height: 0; }
+  #ctl { width: 260px; }
+  #ctl h2 { font: bold 11px var(--ui); margin: 12px 0 4px; color: #000; }
+  #ctl h2:first-child { margin-top: 0; }
+  .row { display: flex; gap: 6px; align-items: center; margin: 5px 0; }
+  .row label { flex: 0 0 74px; }
+  .row output { flex: 0 0 36px; text-align: right; font: 11px var(--ui); font-variant-numeric: tabular-nums; }
+  .row .btn { flex: 1; min-width: 0; padding: 0 6px; }
+  .row .btn.on { box-shadow: var(--pressed); background: repeating-conic-gradient(var(--face) 0 25%, var(--hi) 0 50%) 0 0 / 2px 2px; }   /* a latched toggle, dithered like Win98 */
+  /* a classic trackbar */
+  input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 22px; background: transparent; margin: 0; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--face); box-shadow: var(--sunken); }
+  input[type=range]::-moz-range-track { height: 4px; background: var(--face); box-shadow: var(--sunken); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 20px; margin-top: -8px; background: var(--face); box-shadow: var(--raised); border: 0; border-radius: 0; }
+  input[type=range]::-moz-range-thumb { width: 11px; height: 20px; background: var(--face); box-shadow: var(--raised); border: 0; border-radius: 0; }
+  input[type=range]:focus-visible { outline: 1px dotted #000; outline-offset: 0; }
+  select { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 21px; padding: 0 20px 0 4px; font: 11px var(--ui); color: #000; border: 0; border-radius: 0; cursor: pointer;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 17' shape-rendering='crispEdges'%3E%3Cpath fill='%23e9e7df' d='M0 0h16v17H0z'/%3E%3Cpath fill='%23fff' d='M1 1h14v1H2v14H1z'/%3E%3Cpath fill='%23a3a199' d='M2 15h13v1H2zM14 2h1v13h-1z'/%3E%3Cpath fill='%231e1e1e' d='M0 16h16v1H0zM15 0h1v16h-1z'/%3E%3Cpath d='M4 7h7v1H4zM5 8h5v1H5zM6 9h3v1H6zM7 10h1v1H7z'/%3E%3C/svg%3E") right 2px center / 16px 17px no-repeat; box-shadow: var(--sunken); }
+  select:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+  #shelf { width: 290px; }
+  #shelf .list { margin: 0; padding: 2px; list-style: none; }
+  #shelf .list button { all: unset; box-sizing: border-box; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; padding: 3px 5px; cursor: pointer; font: 11px var(--ui); color: #000; }
+  #shelf .list button:hover { background: #e4e8f2; }
+  #shelf .list button:focus-visible { outline: 1px dotted #000; outline-offset: -1px; }
+  #shelf .list button span { color: #4a4943; white-space: nowrap; }
+  #shelf .list button[aria-current=true] { background: var(--sel); color: #fff; }
+  #shelf .list button[aria-current=true] span { color: #c9d4ef; }
+  #shelf .list .insert { font-weight: bold; }
+  #shelf .note { margin: 8px 2px 0; color: #4a4943; }
+  #shelf .note a { color: #00007b; }
+
+  /* ---------- About (readme.txt) and Keyboard ---------- */
+  dialog.win { position: fixed; padding: 3px; max-width: min(560px, calc(100vw - 24px)); width: 100%; max-height: calc(100% - 24px - var(--st) - var(--sb)); overflow: hidden; display: none; flex-direction: column; }
+  dialog.win[open] { display: flex; }
+  dialog.win::backdrop { background: rgba(0,0,0,.45); }
+  dialog .page { overflow: auto; min-height: 0; margin: 8px 8px 0; padding: 12px 16px; font: 12.5px/1.6 var(--ui); background: #fff; box-shadow: var(--sunken); }
+  dialog .page h3 { font: bold 13px var(--ui); margin: 14px 0 4px; }
+  dialog .page h3:first-child { margin-top: 0; }
+  dialog .page p, dialog .page ul { margin: 0 0 10px; }
+  dialog .page ul { padding-left: 18px; }
+  dialog .page i { font-family: "Times New Roman", Times, serif; font-size: 14px; }
+  dialog .foot { display: flex; justify-content: flex-end; gap: 6px; padding: 10px 8px 7px; }
+  #keys { max-width: min(380px, calc(100vw - 24px)); }
+  #keys table { border-collapse: collapse; width: 100%; }
+  #keys td { padding: 3px 0; vertical-align: top; }
+  #keys td:first-child { width: 96px; white-space: nowrap; }
+  kbd { display: inline-block; min-width: 18px; padding: 0 4px; text-align: center; font: 11px/16px var(--ui); background: var(--face); box-shadow: var(--raised); }
+
+  /* ---------- small screens ---------- */
+  @media (max-width: 980px) {         /* groove.exe sits above the transport instead of beside it */
+    #hud { bottom: calc(var(--gut) + var(--sb) + var(--tph) + 10px); width: 250px; }
+    #scope { height: 46px; }
+    #status { bottom: calc(var(--gut) + var(--sb) + var(--tph) + 6px); left: auto; right: calc(var(--gut) + var(--sr)); transform: none; max-width: 50vw; }
   }
+  @media (max-width: 640px) {
+    :root { --gut: 10px; }
+    #teaser { padding: 4px 8px 4px 6px; gap: 8px; }
+    #teaser svg { width: 26px; height: 26px; }
+    #teaser .sub, #teaser b { display: none; }      /* the face and About: the toggles need the rest of the row */
+    #teaser .line { margin: 0; font-size: 13px; }
+    #toggles button { padding: 9px 9px; }
+    .side { left: calc(var(--gut) + var(--sl)); right: calc(var(--gut) + var(--sr)); width: auto !important; top: calc(var(--gut) + var(--st) + 50px); max-height: calc(100% - var(--st) - var(--sb) - 150px); }
+    #hud { width: min(250px, calc(100vw - 2 * var(--gut))); }
+    #hud #stats { font-size: 10px; gap: 0 8px; }
+    #status { left: var(--gut); right: var(--gut); max-width: none; text-align: center; }
+  }
+  @media (max-height: 500px) and (orientation: landscape) {     /* a phone on its side: the transport narrows, the readout gets small */
+    :root { --gut: 8px; }
+    #hud { bottom: calc(var(--gut) + var(--sb)); width: 220px; }
+    #hud #stats { display: none; }
+    #scope { height: 40px; }
+    #tp { left: auto; right: calc(var(--gut) + var(--sr)); transform: none; width: min(440px, calc(100vw - 250px - var(--sl) - var(--sr))); }
+    .side { max-height: calc(100% - var(--st) - var(--sb) - 60px); }
+    .dlg { top: 50%; }
+  }
+  @media (pointer: coarse) {          /* fingers: bigger targets in the windows and on the transport */
+    :root { --tph: 84px; }
+    #toggles button { padding: 12px 10px; }
+    #b-more { padding: 10px 6px; margin: -10px -6px; }        /* a bigger target than the word */
+    .btn { height: 34px; min-width: 88px; font-size: 13px; }
+    .win, .win .fine { font-size: 13px; }
+    #insert .txt p { font-size: 14px; }
+    .win .x { width: 24px; height: 18px; }
+    .win .cap { height: 24px; line-height: 24px; font-size: 13px; }
+    .chk input { width: 18px; height: 18px; background-size: 9px 9px; }
+    #tl { height: 30px; }
+    #tp .ib { width: 40px; height: 40px; }
+    #tp .row { height: 40px; }
+    #shelf .list button { padding: 9px 8px; font-size: 13px; }
+    #ctl .row { margin: 8px 0; }
+    select { height: 30px; font-size: 13px; }
+    #stats { font-size: 10.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .chrome, #hud, #insert, #power, #gl { transition: none; } }
+  /* while the room's computer has the whole picture (blue screen, its desktop, the shutdown card) the page's own windows step aside */
+  .takeover #hud, .takeover #transport { opacity: 0 !important; pointer-events: none; transition: opacity .12s; }
 </style>
 </head>
 <body>
-<canvas id="gl"></canvas>
-<div id="vig"></div>
+<canvas id="gl" aria-label="A turntable in a room of old computers. Drag to look around, scroll to zoom."></canvas>
 <div id="drop">drop it in the drive</div>
 <canvas id="words"></canvas>
 <div id="loader" class="wait"><div class="bar"><i id="loader-fill"></i></div><span id="loader-pct"></span></div>
 
-<header id="teaser">
-  <div id="logo" aria-label="Ninajirachi, I Love My Computer">
-    <svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="chrome" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".34" stop-color="#d8dce6"/><stop offset=".44" stop-color="#6c707b"/><stop offset=".58" stop-color="#c9cdd7"/><stop offset="1" stop-color="#5a5e68"/></linearGradient></defs>
-      <path d="M14 18 Q4 18 9 27 L44 86 Q50 95 56 86 L91 27 Q96 18 86 18 Z" fill="url(#chrome)" stroke="rgba(255,255,255,.75)" stroke-width="2"/>
-      <rect x="30" y="30" width="9" height="16" rx="2.5" fill="#121318"/><rect x="61" y="30" width="9" height="16" rx="2.5" fill="#121318"/>
-      <path d="M38 56 a6 6 0 0 0 12 0 a6 6 0 0 0 12 0" fill="none" stroke="#121318" stroke-width="3.6" stroke-linecap="round"/></svg>
-    <div><b>NINAJIRACHI</b><span>I LOVE MY COMPUTER</span></div>
-  </div>
-  <p>A record player simulated from the groove up, remixed for Ninajirachi's <i style="font-family:'Times New Roman',serif">I Love My Computer</i>. <button class="link" id="b-more">About</button></p>
+<header id="teaser" class="chrome plate">
+  <svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="chrome" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".34" stop-color="#d8dce6"/><stop offset=".44" stop-color="#6c707b"/><stop offset=".58" stop-color="#c9cdd7"/><stop offset="1" stop-color="#5a5e68"/></linearGradient></defs>
+    <path d="M14 18 Q4 18 9 27 L44 86 Q50 95 56 86 L91 27 Q96 18 86 18 Z" fill="url(#chrome)" stroke="rgba(255,255,255,.75)" stroke-width="2"/>
+    <rect x="30" y="30" width="9" height="16" rx="2.5" fill="#121318"/><rect x="61" y="30" width="9" height="16" rx="2.5" fill="#121318"/>
+    <path d="M38 56 a6 6 0 0 0 12 0 a6 6 0 0 0 12 0" fill="none" stroke="#121318" stroke-width="3.6" stroke-linecap="round"/></svg>
+  <div><b>I Love My Computer</b><span class="line"><span class="sub">A fan remix · </span><button class="link" id="b-more">About</button></span></div>
 </header>
 
-<nav id="toggles">
-  <button id="t-records" aria-pressed="false" title="Records"><span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="now-title">Records</span><span id="now-time"></span></button>
-  <button id="t-flash" aria-pressed="true" title="Flashing lights">Flashing on</button>
-  <button id="t-ctl" aria-pressed="false">Controls</button>
+<nav id="toggles" class="chrome plate" aria-label="Settings">
+  <button id="t-reset" hidden>Reset view</button>
+  <button id="t-records" aria-pressed="false" aria-controls="shelf">Records</button>
+  <button id="t-flash" aria-pressed="true" title="Flashing lights (L)">Flashing on</button>
+  <button id="t-ctl" aria-pressed="false" aria-controls="ctl">Controls</button>
 </nav>
 
-<div id="credit"><button id="t-reset" hidden>Reset view</button><span class="remix"><a href="https://x.com/rauchg" target="_blank" rel="noopener">@rauchg</a> <em>(I Love My Computer remix)</em></span><a href="https://github.com/SunkenInTime/ilmc-vinyl" target="_blank" rel="noopener">source</a></div>
-<div id="foot"><span id="status"></span></div>
+<div id="status" class="chrome" role="status"></div>
 
-<section id="hud" class="panel">
-  <div class="cap" aria-hidden="true"><span>groove.exe</span><i>×</i></div>
-  <canvas id="scope" width="540" height="124" title="The groove walls passing under the stylus"></canvas>
-  <div id="stats">
-    <div><span>speed</span><b id="s-rpm">-</b></div><div><span>groove</span><b id="s-vg">-</b></div>
-    <div><span>radius</span><b id="s-r">-</b></div><div><span>tracking err</span><b id="s-err">-</b></div>
-    <div><span>left wall</span><b id="s-nl">-</b></div><div><span>right wall</span><b id="s-nr">-</b></div>
-    <div><span>mistracking</span><b id="s-loss">-</b></div><div><span>stylus ht</span><b id="s-z">-</b></div>
-    <div><span>cantilever</span><b id="s-xi">-</b></div><div><span>DSP load</span><b id="s-load">-</b></div>
+<section id="tp" class="chrome plate nodisc" aria-label="Transport">
+  <canvas id="tl" tabindex="0" role="slider" aria-label="Position in the song" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></canvas>
+  <div id="tp-tip"></div>
+  <div class="row">
+    <button class="ib" id="tp-play" title="Play (Space)" aria-label="Play"><svg viewBox="0 0 14 14"><path id="tp-play-g" d="M3 1h2v1h1v1h2v1h1v1h2v1h1v2h-1v1h-2v1h-1v1h-2v1h-1v1h-2z"/></svg></button>
+    <span id="tp-title">No disc</span>
+    <button id="tp-insert">Insert disc</button>
+    <span id="tp-time"></span>
+    <button class="ib" id="tp-hide" title="Hide the interface (H)" aria-label="Hide the interface"><svg viewBox="0 0 14 14"><path d="M1 1h5v2h-3v3h-2zM8 1h5v5h-2v-3h-3zM1 8h2v3h3v2h-5zM11 8h2v5h-5v-2h3z" opacity=".55"/><path d="M5 5h4v4h-4z"/></svg></button>
+    <button class="ib" id="tp-full" title="Full screen (F)" aria-label="Full screen" hidden><svg viewBox="0 0 14 14"><path id="tp-full-g" d="M1 1h5v2h-3v3h-2zM8 1h5v5h-2v-3h-3zM1 8h2v3h3v2h-5zM11 8h2v5h-5v-2h3z"/></svg></button>
+  </div>
+</section>
+<div class="bare-hint plate" id="bare-hint"></div>
+
+<section id="hud" class="win" aria-label="groove.exe: the stylus in its groove">
+  <div class="cap"><span>groove.exe</span><button class="x" id="hud-x" title="Close (G brings it back)" aria-label="Close groove.exe"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="wb">
+    <div class="well"><canvas id="scope" width="540" height="116" title="The groove walls passing under the stylus"></canvas></div>
+    <div id="stats">
+      <div><span>speed</span><b id="s-rpm">-</b></div><div><span>groove</span><b id="s-vg">-</b></div>
+      <div><span>radius</span><b id="s-r">-</b></div><div><span>tracking err</span><b id="s-err">-</b></div>
+      <div><span>left wall</span><b id="s-nl">-</b></div><div><span>right wall</span><b id="s-nr">-</b></div>
+      <div><span>mistracking</span><b id="s-loss">-</b></div><div><span>stylus ht</span><b id="s-z">-</b></div>
+      <div><span>cantilever</span><b id="s-xi">-</b></div><div><span>DSP load</span><b id="s-load">-</b></div>
+    </div>
   </div>
 </section>
 
-<section id="ctl" class="panel" hidden>
-  <div class="cap"><span>controls.exe</span><button data-close="t-ctl" aria-label="Close">×</button></div>
-  <div class="row"><button id="b-start">Start</button><button id="b-cue">Cue</button></div>
-  <div class="row"><button data-rpm="33.3333" class="on">33</button><button data-rpm="45">45</button><button data-rpm="78.26">78</button></div>
-  <div class="row"><label>Volume</label><input id="p-volume" type="range" min="0" max="1" step="0.01" value="1"><output></output></div>
+<section id="ctl" class="win side" hidden aria-label="Controls">
+  <div class="cap"><span>controls.exe</span><button class="x" data-close="t-ctl" aria-label="Close"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="wb">
+    <h2>Deck</h2>
+    <div class="row"><button class="btn" id="b-start">Start</button><button class="btn" id="b-cue">Cue</button></div>
+    <div class="row"><button class="btn on" data-rpm="33.3333">33</button><button class="btn" data-rpm="45">45</button><button class="btn" data-rpm="78.26">78</button></div>
+    <div class="row"><label for="p-volume">Volume</label><input id="p-volume" type="range" min="0" max="1" step="0.01" value="1"><output></output></div>
 
-  <h2>Cartridge</h2>
-  <div class="row"><select id="p-stylus"><option value="elliptical">Elliptical 0.3 x 0.7 mil</option><option value="conical">Conical 0.7 mil</option><option value="microline">Micro-line</option></select></div>
-  <div class="row"><label>Tracking g</label><input id="p-vtf" type="range" min="0.2" max="4" step="0.05" value="1.8"><output></output></div>
-  <div class="row"><label>Anti-skate</label><input id="p-antiskate" type="range" min="0" max="4" step="0.05" value="1.8"><output></output></div>
-  <div class="row"><label>Mains hum</label><input id="p-hum" type="range" min="0" max="3" step="0.05" value="0"><output></output></div>
+    <h2>Cartridge</h2>
+    <div class="row"><select id="p-stylus" aria-label="Stylus"><option value="elliptical">Elliptical 0.3 x 0.7 mil</option><option value="conical">Conical 0.7 mil</option><option value="microline">Micro-line</option></select></div>
+    <div class="row"><label for="p-vtf">Tracking g</label><input id="p-vtf" type="range" min="0.2" max="4" step="0.05" value="1.8"><output></output></div>
+    <div class="row"><label for="p-antiskate">Anti-skate</label><input id="p-antiskate" type="range" min="0" max="4" step="0.05" value="1.8"><output></output></div>
+    <div class="row"><label for="p-hum">Mains hum</label><input id="p-hum" type="range" min="0" max="3" step="0.05" value="0"><output></output></div>
 
-  <h2>This pressing</h2>
-  <div class="row"><label>Surface</label><input id="c-noise" type="range" min="0" max="4" step="0.05" value="1"><output></output></div>
-  <div class="row"><label>Dust</label><input id="c-dust" type="range" min="0" max="3" step="0.05" value="0.25"><output></output></div>
-  <div class="row"><label>Scratches</label><input id="c-scratches" type="range" min="0" max="2" step="0.05" value="0.2"><output></output></div>
-  <div class="row"><label>Warp mm</label><input id="c-warp" type="range" min="0" max="2" step="0.05" value="0.3"><output></output></div>
-  <div class="row"><label>Off-centre</label><input id="c-offCenter" type="range" min="0" max="1.5" step="0.05" value="0.15"><output></output></div>
-  <div class="row"><button id="b-press">Press again</button><label class="file" for="f-audio">Cut a file</label><input id="f-audio" type="file" accept="audio/*,.mp3,.flac,.wav,.m4a,.aac,.alac,.ogg,.oga,.opus,.aif,.aiff,.webm" multiple hidden></div>
-  <div class="row"><button id="b-bump">Knock the table</button><button id="b-sfx">Sounds on</button></div>
+    <h2>This pressing</h2>
+    <div class="row"><label for="c-noise">Surface</label><input id="c-noise" type="range" min="0" max="4" step="0.05" value="1"><output></output></div>
+    <div class="row"><label for="c-dust">Dust</label><input id="c-dust" type="range" min="0" max="3" step="0.05" value="0.25"><output></output></div>
+    <div class="row"><label for="c-scratches">Scratches</label><input id="c-scratches" type="range" min="0" max="2" step="0.05" value="0.2"><output></output></div>
+    <div class="row"><label for="c-warp">Warp mm</label><input id="c-warp" type="range" min="0" max="2" step="0.05" value="0.3"><output></output></div>
+    <div class="row"><label for="c-offCenter">Off-centre</label><input id="c-offCenter" type="range" min="0" max="1.5" step="0.05" value="0.15"><output></output></div>
+    <div class="row"><button class="btn" id="b-press">Press again</button><button class="btn" id="b-bump">Knock the table</button></div>
+    <input id="f-audio" type="file" accept="audio/*,.mp3,.flac,.wav,.m4a,.aac,.alac,.ogg,.oga,.opus,.aif,.aiff,.webm" hidden>
+
+    <h2>This page</h2>
+    <div class="row"><label class="chk" style="flex:1"><input type="checkbox" id="b-sfx"><span>Interface sounds</span></label></div>
+    <div class="row"><label class="chk" style="flex:1"><input type="checkbox" id="b-hud"><span>groove.exe readout</span></label></div>
+    <div class="row"><button class="btn" id="b-keys">Keyboard shortcuts</button></div>
+  </div>
 </section>
 
-<section id="shelf" class="panel" hidden><div class="cap"><span>records.exe</span><button data-close="t-records" aria-label="Close">×</button></div></section>
+<section id="shelf" class="win side" hidden aria-label="Records">
+  <div class="cap"><span>records.exe</span><button class="x" data-close="t-records" aria-label="Close"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="wb">
+    <div class="field"><ul class="list" id="shelf-list"></ul></div>
+    <p class="note" id="shelf-note"></p>
+  </div>
+</section>
 
-<dialog id="more">
-  <h3>I Love My Computer, on a simulated record player</h3>
-  <p>A fan remix of Guillermo Rauch's <a href="https://github.com/rauchg/vinyl" target="_blank" rel="noopener">vinyl</a>, a record player simulated from the groove up, rebuilt as a love letter to Ninajirachi's album <a href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener">I Love My Computer</a>.</p>
-  <p><strong>Bring your own copy.</strong> No music from the album comes with this page. When you insert your copy of <em>Fuck My Computer</em>, your browser cuts it into a spiral groove and a simulated stylus reads it back. The file never leaves your computer. If the page recognises the song, the room around the deck plays along: her lyrics, her vocal chops, the build-ups and the drops. Any other song works too, and the room follows its kicks.</p>
-  <p><strong>The deck.</strong> Nothing here is an audio player. The lathe turns the music into the two walls of a stereo groove, <span id="d-points">millions of</span> points each. The pressing plant adds dust, scratches and warp to that geometry. The engine moves a simulated stylus against both walls <span id="d-rate">hundreds of thousands of</span> times a second, and what you hear is the voltage a moving-magnet cartridge would make. Drop the needle anywhere, drag the record to scratch it, scroll to zoom in on the stylus.</p>
-  <p><strong>Credits.</strong> Music, lyrics and the :3 face: Ninajirachi. Deck, groove and physics: Guillermo Rauch (MIT). The room: Dara Adedeji. Records on the shelf are public domain or freely licensed; each one is credited on the shelf. Built with three.js.</p>
-  <p class="fine">An unofficial fan project, not affiliated with Ninajirachi or her label. <a href="https://github.com/SunkenInTime/ilmc-vinyl" target="_blank" rel="noopener">Source on GitHub</a>.</p>
-  <form method="dialog"><button>Close</button></form>
+<dialog id="more" class="win" aria-labelledby="more-t">
+  <div class="cap"><span id="more-t">readme.txt</span><button class="x" data-dialog-close aria-label="Close"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="page">
+    <h3>I Love My Computer, on a simulated record player</h3>
+    <p>A fan remix of Guillermo Rauch's <a href="https://github.com/rauchg/vinyl" target="_blank" rel="noopener">vinyl</a>, a record player simulated from the groove up, rebuilt for Ninajirachi's album <a href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener"><i>I Love My Computer</i></a>.</p>
+    <h3>Bring your own copy</h3>
+    <p>No music from the album comes with this page. Insert your copy of <i>Fuck My Computer</i> and your browser cuts it into a spiral groove, presses a record and plays it with a simulated stylus. The file never leaves your computer. When the page recognises the song, the room performs it: her lyrics, her vocal chops, the build-ups and the drops. You can <a href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener">buy the album on Bandcamp</a>.</p>
+    <h3>The deck</h3>
+    <p>Nothing here is an audio player. The lathe turns the music into the two walls of a stereo groove, <span id="d-points">millions of</span> points each. The pressing plant adds dust, scratches and warp. The engine moves a stylus against both walls <span id="d-rate">hundreds of thousands of</span> times a second, and what you hear is the voltage a moving-magnet cartridge would make. Click the record to drop the needle anywhere, drag it to scratch, scroll to zoom in on the stylus. groove.exe, bottom left, shows the groove walls passing under the tip.</p>
+    <h3>Flashing</h3>
+    <p>The room strobes and flashes in time with the music. <b>Flashing off</b> (top right, or the L key) keeps the show but drops the strobes, the flashes and the glitches.</p>
+    <h3>Credits</h3>
+    <p>Music, lyrics and the :3 face: Ninajirachi. Deck, groove and physics: <a href="https://x.com/rauchg" target="_blank" rel="noopener">Guillermo Rauch</a> (MIT). The room: Dara Adedeji. The records on the shelf are public domain or freely licensed, each credited on the shelf. Built with three.js.</p>
+    <p class="fine">An unofficial fan project, not affiliated with Ninajirachi or her label. <a href="https://github.com/SunkenInTime/ilmc-vinyl" target="_blank" rel="noopener">Source on GitHub</a>.</p>
+  </div>
+  <div class="foot"><button class="btn" id="b-keys2">Keyboard shortcuts</button><button class="btn def" data-dialog-close autofocus>OK</button></div>
 </dialog>
 
-<div id="power">
-  <div id="insert" data-state="idle" role="dialog" aria-labelledby="insert-t">
-    <div class="cap"><span id="insert-t">Insert disc</span><i aria-hidden="true">×</i></div>
-    <div class="body">
+<dialog id="keys" class="win" aria-labelledby="keys-t">
+  <div class="cap"><span id="keys-t">Keyboard shortcuts</span><button class="x" data-dialog-close aria-label="Close"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="page"><table>
+    <tr><td><kbd>Space</kbd></td><td>Play / pause (the platter spins down and back up)</td></tr>
+    <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Back / forward 10 seconds</td></tr>
+    <tr><td><kbd>H</kbd></td><td>Hide the interface, for watching or recording</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+    <tr><td><kbd>L</kbd></td><td>Flashing on / off</td></tr>
+    <tr><td><kbd>G</kbd></td><td>groove.exe readout</td></tr>
+    <tr><td><kbd>C</kbd></td><td>Lift / lower the needle</td></tr>
+    <tr><td><kbd>Z</kbd></td><td>Zoom in on the stylus</td></tr>
+    <tr><td><kbd>B</kbd></td><td>Knock the table</td></tr>
+    <tr><td><kbd>?</kbd></td><td>This list</td></tr>
+  </table></div>
+  <div class="foot"><button class="btn def" data-dialog-close autofocus>OK</button></div>
+</dialog>
+
+<div id="power"><span id="power-msg" class="plate"></span></div>
+
+<div id="insert" class="win dlg" data-state="idle" role="dialog" aria-labelledby="insert-t">
+  <div class="cap"><span id="insert-t">Insert disc</span><button class="x" id="insert-x" aria-label="Close"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="wb">
+    <div class="top">
       <div class="cd" aria-hidden="true"></div>
+      <div class="cover" aria-hidden="true"><img id="insert-art" alt=""></div>
       <div class="txt">
-        <p data-show="idle error">Bring your own copy of <i>Fuck My Computer</i> by Ninajirachi. The deck cuts it into a groove right here in your browser; the file never leaves your computer.</p>
+        <p data-show="loading">Loading the record...</p>
+        <p data-show="idle error">Insert your copy of <i>Fuck My Computer</i> by Ninajirachi.</p>
+        <p data-show="idle" class="fine">Your browser cuts it into a record right here. The file never leaves your computer.</p>
         <p data-show="error" class="err" id="insert-err"></p>
         <p data-show="cutting"><b>Cutting the groove</b><br><span class="fine" id="insert-status">Reading the file</span></p>
         <p data-show="ready"><b id="insert-title"></b><br><span class="fine" id="insert-note"></span></p>
       </div>
     </div>
-    <div class="btns" data-show="idle error"><button id="b-insert" class="def">Choose a file</button><a href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener">Buy it on Bandcamp</a></div>
-    <div class="btns" data-show="ready"><button id="b-play" class="def">Drop the needle</button><button id="b-other">Choose another</button></div>
-    <p class="fmt" data-show="idle error">MP3 · FLAC · WAV · M4A · OGG · OPUS<br>or drop the file anywhere on the page</p>
-    <p class="alt" data-show="idle error"><button class="link" id="b-demo">or play a public-domain record instead</button></p>
+    <div class="prog" data-show="cutting" role="progressbar" aria-label="Cutting the groove"><i id="insert-prog"></i></div>
+    <div class="btns" data-show="idle error"><a class="btn" href="https://ninajirachi.bandcamp.com/album/i-love-my-computer" target="_blank" rel="noopener">Buy on Bandcamp</a><button class="btn def" id="b-insert">Choose file...</button></div>
+    <div class="btns" data-show="ready"><button class="btn" id="b-other">Choose another</button><button class="btn def" id="b-play">Drop the needle</button></div>
+    <hr class="etch" data-show="idle error ready">
+    <div class="warn" data-show="idle error ready">
+      <svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><path d="M15 2h2l14 26v2H1v-2z" fill="#000"/><path d="M15.5 4h1l12.8 24.5H2.7z" fill="#ffe10a"/><path d="M14.5 10h3l-.7 11h-1.6zM14.5 23h3v3h-3z" fill="#000"/></svg>
+      <div><p><b>Flashing lights.</b> The room strobes hard in time with the music.</p><label class="chk"><input type="checkbox" id="calm"><span>Turn flashing off</span></label></div>
+    </div>
+    <p class="alt" data-show="idle error">No copy? <button class="link" id="b-demo">Play a public-domain record instead</button></p>
   </div>
-  <span id="power-msg"></span>
+</div>
+
+<div id="end" class="win dlg" role="dialog" aria-labelledby="end-t" hidden>
+  <div class="cap"><span id="end-t">End of side</span><button class="x" id="end-x" aria-label="Close"><svg viewBox="0 0 8 7"><path d="M0 0h2v1h1v1h2v-1h1v-1h2v1h-1v1h-1v1h-1v1h1v1h1v1h1v1h-2v-1h-1v-1h-2v1h-1v1h-2v-1h1v-1h1v-1h1v-1h-1v-1h-1v-1h-1z"/></svg></button></div>
+  <div class="wb">
+    <div class="top">
+      <svg class="ico" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#1a1a1a"/><circle cx="16" cy="16" r="10.5" fill="none" stroke="#3a3a3a"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="#3a3a3a"/><circle cx="16" cy="16" r="5" fill="#ffe10a"/><circle cx="16" cy="16" r="1.2" fill="#000"/></svg>
+      <div class="txt"><p><b id="end-title">That's the record.</b><br><span class="fine">The needle is in the run-out groove.</span></p></div>
+    </div>
+    <div class="btns"><button class="btn" id="end-shelf">Records...</button><button class="btn def" id="end-again">Play again</button></div>
+  </div>
 </div>
 <script type="module" src="src/main.js"></script>
 </body>
