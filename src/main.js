@@ -15,7 +15,7 @@ import { sfx } from './ilmc/sfx.js';
 const $ = (id) => document.getElementById(id);
 const canvas = $('gl'), renderer = new Renderer(canvas);
 // ?og (the share image) and ?plain (the deck on its own) skip the room
-const PLAIN = /[?&](og|plain)(&|$)/.test(location.search);
+const PLAIN = /[?&](og|plain)(=|&|$)/.test(location.search);
 const reduceFlashing = () => { try { const v = localStorage.getItem('ilmc-flash'); return v ? v === 'off' : matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 const PRIV = window.__private;   // see index.html
 const root = document.documentElement;
@@ -29,7 +29,7 @@ const worker = { postMessage: (m, transfer) => { busy(); (masterWorker ||= start
 const busy = (h = { got: 0, total: 0 }) => (window.__load = h);
 const idle = () => { if (window.__load) window.__load.done = true; };
 const AZ0 = -0.5, EL0 = PLAIN_CAM() ? 0.6 : 0.86, ZOOM0 = PLAIN_CAM() ? 0 : -1.35;   // default camera: pulled back to see the room
-function PLAIN_CAM() { return /[?&](og|plain)(&|$)/.test(location.search); }
+function PLAIN_CAM() { return /[?&](og|plain)(=|&|$)/.test(location.search); }
 const S = { hudOn: false, lastDown: 0, tel: null, tRecv: 0, zoom: ZOOM0, zoomT: ZOOM0, az: AZ0, el: EL0, rpm: 33.3333, rec: null, pending: null, motor: false, cue: true, ready: false };
 let ctx = null, node = null, drag = null;
 // ?og renders just the deck on black, with no interface and no audio: it is how og.png (the share image) is made
@@ -327,7 +327,7 @@ async function cutFiles(files) {
   if (!tracks.length) {
     sfx.error(); const msg = `This browser can't read ${list[0].name}. Try an MP3, FLAC, WAV or M4A.`;
     insertState('error', { err: msg });
-    return;                                     // nothing to cut: the window says why, and what is on the platter stays
+    S.fileCut = 0; return;                      // nothing to cut: the window says why, and what is on the platter stays
   }
   // is it the song?
   cutStage('match');
@@ -382,6 +382,7 @@ function markRecord(r) {
 }
 async function pickRecord(r) {
   const me = ++pick;
+  if (S.fileCut) insertState('idle');           // a cut abandoned for the shelf: its window goes back to asking
   markRecord(r);
   ilmc?.setSong(null); S.matched = false; S.fileCut = 0;          // the shelf's records have no map: the room follows their kicks
   art.set({ title: r.title, artist: r.by });
@@ -872,6 +873,6 @@ function tick() {
   if (frame % 15 === 0) checkIdle();
 }
 tick();
-if (!PRIV && !OG) showRoom();      // the public page: the room is on screen as soon as it has been drawn once
+if (!PRIV) showRoom();      // the public page: the room is on screen as soon as it has been drawn once
 updateTransport();
 window.__rp = { S, get ctx() { return ctx; }, send, renderer, stylusXY, ilmc, seek };   // debugging handle

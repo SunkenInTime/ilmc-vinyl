@@ -173,7 +173,7 @@ export class Land {
     };
     // the lawn's map of what lies on it (mask()): black until the first picture is taken
     this.maskRT = new THREE.WebGLRenderTarget(512, 512, { depthBuffer: true, generateMipmaps: false }); lu.uMask.value = this.maskRT.texture;
-    this.maskMat = new THREE.ShaderMaterial({ vertexShader: 'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }', side: THREE.DoubleSide });
+    this.maskMat = new THREE.ShaderMaterial({ vertexShader: ['void main() { vec4 p = vec4(position, 1.0);', '#ifdef USE_INSTANCING', 'p = instanceMatrix * p;', '#endif', 'gl_Position = projectionMatrix * modelViewMatrix * p; }'].join('\n'), fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }', side: THREE.DoubleSide });
     this.maskCam = new THREE.OrthographicCamera(-4, 4, 4, -4, 0.05, 12); this.maskCam.matrixAutoUpdate = false; this.maskCam.matrixWorldAutoUpdate = false;
     // two hidden stand-ins so the mask's program (plain and instanced) is built with the room's, not in the middle of the song
     this.warm = new THREE.Group(); this.warm.add(new THREE.Mesh(new THREE.PlaneGeometry(0.001, 0.001), this.maskMat), new THREE.InstancedMesh(new THREE.PlaneGeometry(0.001, 0.001), this.maskMat, 1));
