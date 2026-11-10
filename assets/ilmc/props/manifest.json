@@ -1,0 +1,758 @@
+{
+ "about": "The floor kit (src/ilmc/props.js). Models: Poly Haven glTFs, re-baked (split into props, origin on the floor, simplified, WebP textures, meshopt) by tools/props-bake/. Surfaces: tiling WebP sets in assets/ilmc/tex/, UVs in metres, `tile` = metres per repeat. Every asset here is CC0 1.0 (public domain); credit is kind, not required. Props made in code (props-made.js) are original artwork.",
+ "bytes": 7715268,
+ "models": [
+  {
+   "file": "tv_black.glb",
+   "bytes": 182752,
+   "title": "Television 02",
+   "source": "https://polyhaven.com/a/television_02",
+   "authors": [
+    "Benny Weimer"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "tv_black": {
+     "w": 0.4,
+     "d": 0.35,
+     "h": 0.411,
+     "tris": 2310
+    }
+   }
+  },
+  {
+   "file": "boombox.glb",
+   "bytes": 539012,
+   "title": "Boombox",
+   "source": "https://polyhaven.com/a/boombox",
+   "authors": [
+    "Thomas Paul Mouilleron"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "boombox": {
+     "w": 0.724,
+     "d": 0.186,
+     "h": 0.47,
+     "tris": 5030
+    }
+   }
+  },
+  {
+   "file": "laptop_90s.glb",
+   "bytes": 363252,
+   "title": "Classic Laptop",
+   "source": "https://polyhaven.com/a/classic_laptop",
+   "authors": [
+    "Arrangemonk"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "laptop_90s": {
+     "w": 0.652,
+     "d": 0.486,
+     "h": 0.543,
+     "tris": 5997
+    }
+   }
+  },
+  {
+   "file": "motherboard.glb",
+   "bytes": 693156,
+   "title": "Circuit Board",
+   "source": "https://polyhaven.com/a/circuit_board",
+   "authors": [
+    "Benny Weimer"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "motherboard": {
+     "w": 0.404,
+     "d": 0.397,
+     "h": 0.078,
+     "tris": 6931
+    }
+   }
+  },
+  {
+   "file": "plant.glb",
+   "bytes": 584196,
+   "title": "Potted Plant 02",
+   "source": "https://polyhaven.com/a/potted_plant_02",
+   "authors": [
+    "Rico Cilliers"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "plant": {
+     "w": 0.701,
+     "d": 0.657,
+     "h": 0.84,
+     "tris": 24282
+    }
+   }
+  },
+  {
+   "file": "pillows.glb",
+   "bytes": 272596,
+   "title": "Throw Pillows 01",
+   "source": "https://polyhaven.com/a/throw_pillows_01",
+   "authors": [
+    "Serhii Khromov"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "pillow": {
+     "w": 0.572,
+     "d": 0.427,
+     "h": 0.45,
+     "tris": 3238
+    },
+    "pillow_2": {
+     "w": 0.502,
+     "d": 0.33,
+     "h": 0.443,
+     "tris": 3124
+    }
+   }
+  },
+  {
+   "file": "milk_crate.glb",
+   "bytes": 327008,
+   "title": "Plastic Crate 01",
+   "source": "https://polyhaven.com/a/plastic_crate_01",
+   "authors": [
+    "PierreB3D"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "milk_crate": {
+     "w": 0.298,
+     "d": 0.408,
+     "h": 0.264,
+     "tris": 10516
+    }
+   }
+  },
+  {
+   "file": "cardboard_box.glb",
+   "bytes": 370920,
+   "title": "Cardboard Box 01",
+   "source": "https://polyhaven.com/a/cardboard_box_01",
+   "authors": [
+    "Rahul Chaudhary"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "cardboard_box": {
+     "w": 0.387,
+     "d": 0.516,
+     "h": 0.342,
+     "tris": 3000
+    }
+   }
+  },
+  {
+   "file": "tv_silver.glb",
+   "bytes": 273924,
+   "title": "Television 01",
+   "source": "https://polyhaven.com/a/Television_01",
+   "authors": [
+    "Gabriel Radić"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "tv_silver": {
+     "w": 0.6,
+     "d": 0.471,
+     "h": 0.457,
+     "tris": 1918
+    }
+   }
+  },
+  {
+   "file": "desk_lamp.glb",
+   "bytes": 237740,
+   "title": "Desk Lamp Arm 01",
+   "source": "https://polyhaven.com/a/desk_lamp_arm_01",
+   "authors": [
+    "Yann Kervran",
+    "Kuutti Siitonen"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "desk_lamp": {
+     "w": 0.202,
+     "d": 0.614,
+     "h": 0.893,
+     "tris": 7526
+    }
+   }
+  },
+  {
+   "file": "gamepad.glb",
+   "bytes": 85948,
+   "title": "Gamepad",
+   "source": "https://polyhaven.com/a/gamepad",
+   "authors": [
+    "Josh Dean"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "gamepad": {
+     "w": 0.404,
+     "d": 0.434,
+     "h": 0.019,
+     "tris": 2999
+    }
+   }
+  },
+  {
+   "file": "walkman.glb",
+   "bytes": 201988,
+   "title": "Portable Cassette Player",
+   "source": "https://polyhaven.com/a/portable_cassette_player",
+   "authors": [
+    "Mateusz Sadek"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "walkman": {
+     "w": 0.098,
+     "d": 0.04,
+     "h": 0.13,
+     "tris": 3737
+    },
+    "cassette": {
+     "w": 0.062,
+     "d": 0.098,
+     "h": 0.012,
+     "tris": 932
+    }
+   }
+  },
+  {
+   "file": "tape_recorder.glb",
+   "bytes": 196232,
+   "title": "Cassette Player",
+   "source": "https://polyhaven.com/a/cassette_player",
+   "authors": [
+    "Oday Abuzaeed"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "tape_recorder": {
+     "w": 0.129,
+     "d": 0.237,
+     "h": 0.049,
+     "tris": 2997
+    }
+   }
+  },
+  {
+   "file": "notebooks.glb",
+   "bytes": 132736,
+   "title": "Binder Notebook",
+   "source": "https://polyhaven.com/a/binder_notebook",
+   "authors": [
+    "DaDrood"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "notebook_open": {
+     "w": 0.365,
+     "d": 0.2,
+     "h": 0.017,
+     "tris": 2495
+    },
+    "notebook": {
+     "w": 0.17,
+     "d": 0.2,
+     "h": 0.025,
+     "tris": 2503
+    }
+   }
+  },
+  {
+   "file": "notepads.glb",
+   "bytes": 35408,
+   "title": "Office Notepads",
+   "source": "https://polyhaven.com/a/office_notepads",
+   "authors": [
+    "Ulan Cabanilla"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "legal_pad": {
+     "w": 0.223,
+     "d": 0.307,
+     "h": 0.01,
+     "tris": 12
+    },
+    "sticky_notes": {
+     "w": 0.072,
+     "d": 0.072,
+     "h": 0.022,
+     "tris": 12
+    },
+    "paper_stack": {
+     "w": 0.21,
+     "d": 0.29,
+     "h": 0.01,
+     "tris": 12
+    },
+    "note_cards": {
+     "w": 0.196,
+     "d": 0.112,
+     "h": 0.01,
+     "tris": 12
+    },
+    "paper_sheet": {
+     "w": 0.21,
+     "d": 0.29,
+     "h": 0,
+     "tris": 120
+    },
+    "paper_sheet_2": {
+     "w": 0.21,
+     "d": 0.29,
+     "h": 0,
+     "tris": 120
+    }
+   }
+  },
+  {
+   "file": "postcards.glb",
+   "bytes": 274928,
+   "title": "Postcard Set 01",
+   "source": "https://polyhaven.com/a/postcard_set_01",
+   "authors": [
+    "James Ray Cock",
+    "Jurita Burger"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "postcard_1": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_3": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_5": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_8": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_11": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_14": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_17": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    },
+    "postcard_20": {
+     "w": 0.167,
+     "d": 0.105,
+     "h": 0,
+     "tris": 136
+    }
+   }
+  },
+  {
+   "file": "stationery.glb",
+   "bytes": 121764,
+   "title": "Stationery Supplies",
+   "source": "https://polyhaven.com/a/stationery_supplies",
+   "authors": [
+    "Mateusz Sadek"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "pencil_cup": {
+     "w": 0.084,
+     "d": 0.084,
+     "h": 0.084,
+     "tris": 768
+    },
+    "pen_red": {
+     "w": 0.141,
+     "d": 0.008,
+     "h": 0.008,
+     "tris": 672
+    },
+    "pen_blue": {
+     "w": 0.161,
+     "d": 0.009,
+     "h": 0.01,
+     "tris": 721
+    },
+    "pencil": {
+     "w": 0.12,
+     "d": 0.008,
+     "h": 0.008,
+     "tris": 306
+    },
+    "eraser": {
+     "w": 0.045,
+     "d": 0.019,
+     "h": 0.01,
+     "tris": 108
+    }
+   }
+  },
+  {
+   "file": "spray_cans.glb",
+   "bytes": 149220,
+   "title": "Spray Paint Bottles 02",
+   "source": "https://polyhaven.com/a/spray_paint_bottles_02",
+   "authors": [
+    "Riley Queen"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "spray_can": {
+     "w": 0.076,
+     "d": 0.076,
+     "h": 0.217,
+     "tris": 1686
+    },
+    "spray_can_dented": {
+     "w": 0.095,
+     "d": 0.076,
+     "h": 0.19,
+     "tris": 1812
+    }
+   }
+  },
+  {
+   "file": "alarm_clock.glb",
+   "bytes": 141420,
+   "title": "Alarm Clock 01",
+   "source": "https://polyhaven.com/a/alarm_clock_01",
+   "authors": [
+    "Yann Kervran",
+    "James Ray Cock"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "alarm_clock": {
+     "w": 0.131,
+     "d": 0.067,
+     "h": 0.174,
+     "tris": 3586
+    }
+   }
+  },
+  {
+   "file": "watch.glb",
+   "bytes": 197536,
+   "title": "Digital Wrist Watch",
+   "source": "https://polyhaven.com/a/digital_wrist_watch",
+   "authors": [
+    "Adrian C"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "watch": {
+     "w": 0.036,
+     "d": 0.217,
+     "h": 0.008,
+     "tris": 4048
+    }
+   }
+  },
+  {
+   "file": "multimeter.glb",
+   "bytes": 118472,
+   "title": "Retro Multimeter",
+   "source": "https://polyhaven.com/a/retro_multimeter",
+   "authors": [
+    "elli moeller"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "multimeter": {
+     "w": 0.216,
+     "d": 0.202,
+     "h": 0.278,
+     "tris": 4087
+    }
+   }
+  },
+  {
+   "file": "aloe.glb",
+   "bytes": 200632,
+   "title": "Potted Plant 04",
+   "source": "https://polyhaven.com/a/potted_plant_04",
+   "authors": [
+    "James Ray Cock"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "aloe": {
+     "w": 0.168,
+     "d": 0.184,
+     "h": 0.267,
+     "tris": 4289
+    }
+   }
+  },
+  {
+   "file": "duck.glb",
+   "bytes": 59672,
+   "title": "Rubber Duck Toy",
+   "source": "https://polyhaven.com/a/rubber_duck_toy",
+   "authors": [
+    "Plat251"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "duck": {
+     "w": 0.117,
+     "d": 0.165,
+     "h": 0.157,
+     "tris": 3000
+    }
+   }
+  },
+  {
+   "file": "football.glb",
+   "bytes": 204124,
+   "title": "Football",
+   "source": "https://polyhaven.com/a/football",
+   "authors": [
+    "Amal Kumar"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "football": {
+     "w": 0.22,
+     "d": 0.221,
+     "h": 0.222,
+     "tris": 1076
+    }
+   }
+  },
+  {
+   "file": "bin_bag.glb",
+   "bytes": 342772,
+   "title": "Trashbag",
+   "source": "https://polyhaven.com/a/trashbag",
+   "authors": [
+    "Benny Weimer"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "bin_bag": {
+     "w": 0.528,
+     "d": 0.463,
+     "h": 0.575,
+     "tris": 4482
+    }
+   }
+  },
+  {
+   "file": "storage_tub.glb",
+   "bytes": 195892,
+   "title": "Plastic Container",
+   "source": "https://polyhaven.com/a/plastic_container",
+   "authors": [
+    "PierreB3D"
+   ],
+   "licence": "CC0-1.0",
+   "props": {
+    "storage_tub": {
+     "w": 0.895,
+     "d": 0.626,
+     "h": 0.43,
+     "tris": 4070
+    }
+   }
+  }
+ ],
+ "surfaces": {
+  "carpet": {
+   "col": "carpet_col.webp",
+   "nor": "carpet_nor.webp",
+   "rough": "carpet_rough.webp",
+   "px": 512,
+   "tile": 0.5,
+   "mean": "#343b49",
+   "roughness": 0.88,
+   "tint": false,
+   "bytes": 239810,
+   "source": "https://ambientcg.com/view?id=Carpet012",
+   "title": "Carpet 012",
+   "authors": [
+    "Lennart Demes (ambientCG)"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "carpet_pink": {
+   "col": "carpet_pink_col.webp",
+   "nor": "carpet_pink_nor.webp",
+   "rough": "carpet_pink_rough.webp",
+   "px": 512,
+   "tile": 0.5,
+   "mean": "#a95b5a",
+   "roughness": 0.88,
+   "tint": false,
+   "bytes": 269186,
+   "source": "https://ambientcg.com/view?id=Carpet013",
+   "title": "Carpet 013",
+   "authors": [
+    "Lennart Demes (ambientCG)"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "rug_checks": {
+   "col": "rug_checks_col.webp",
+   "nor": "rug_checks_nor.webp",
+   "rough": "rug_checks_rough.webp",
+   "px": 512,
+   "tile": 0.6,
+   "mean": "#092337",
+   "roughness": 0.87,
+   "tint": false,
+   "bytes": 178232,
+   "source": "https://ambientcg.com/view?id=Carpet006",
+   "title": "Carpet 006",
+   "authors": [
+    "Lennart Demes (ambientCG)"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "wood": {
+   "col": "wood_col.webp",
+   "nor": "wood_nor.webp",
+   "rough": "wood_rough.webp",
+   "px": 1024,
+   "tile": 1.7,
+   "mean": "#9b8163",
+   "roughness": 0.38,
+   "tint": false,
+   "bytes": 200764,
+   "source": "https://polyhaven.com/a/laminate_floor_02",
+   "title": "Laminate Floor 02",
+   "authors": [
+    "Dario Barresi",
+    "Charlotte Baglioni"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "jersey": {
+   "col": "jersey_col.webp",
+   "nor": "jersey_nor.webp",
+   "rough": "jersey_rough.webp",
+   "px": 512,
+   "tile": 0.264,
+   "mean": "#b3b3b3",
+   "roughness": 0.8,
+   "tint": true,
+   "bytes": 8870,
+   "source": "https://polyhaven.com/a/cotton_jersey",
+   "title": "Cotton Jersey",
+   "authors": [
+    "colormass",
+    "Rico Cilliers"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "fleece": {
+   "col": "fleece_col.webp",
+   "nor": "fleece_nor.webp",
+   "rough": "fleece_rough.webp",
+   "px": 512,
+   "tile": 0.273,
+   "mean": "#c3c3c3",
+   "roughness": 0.66,
+   "tint": true,
+   "bytes": 73792,
+   "source": "https://polyhaven.com/a/jogging_melange",
+   "title": "Jogging Melange",
+   "authors": [
+    "colormass",
+    "Rico Cilliers"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "denim": {
+   "col": "denim_col.webp",
+   "nor": "denim_nor.webp",
+   "rough": "denim_rough.webp",
+   "px": 512,
+   "tile": 0.271,
+   "mean": "#395877",
+   "roughness": 0.69,
+   "tint": false,
+   "bytes": 93030,
+   "source": "https://polyhaven.com/a/denim_fabric_03",
+   "title": "Denim Fabric 03",
+   "authors": [
+    "colormass",
+    "Rico Cilliers"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "gingham": {
+   "col": "gingham_col.webp",
+   "nor": "gingham_nor.webp",
+   "rough": "gingham_rough.webp",
+   "px": 512,
+   "tile": 0.29,
+   "mean": "#7a9184",
+   "roughness": 0.65,
+   "tint": false,
+   "bytes": 49858,
+   "source": "https://polyhaven.com/a/gingham_check",
+   "title": "Gingham Check",
+   "authors": [
+    "colormass",
+    "Rico Cilliers"
+   ],
+   "licence": "CC0-1.0"
+  },
+  "teddy": {
+   "col": "teddy_col.webp",
+   "nor": "teddy_nor.webp",
+   "rough": "teddy_rough.webp",
+   "px": 512,
+   "tile": 0.33,
+   "mean": "#b6b6b6",
+   "roughness": 0.7,
+   "tint": true,
+   "bytes": 98426,
+   "source": "https://polyhaven.com/a/curly_teddy_natural",
+   "title": "Curly Teddy Natural",
+   "authors": [
+    "colormass",
+    "Rico Cilliers"
+   ],
+   "licence": "CC0-1.0"
+  }
+ }
+}

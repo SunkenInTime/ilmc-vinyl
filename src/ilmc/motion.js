@@ -42,22 +42,23 @@ export class Body {
       Math.sin(p.x * 2.1 + t * 0.47 + f[4]) + Math.sin(p.y * 1.1 - t * 0.33 + f[5]),
     ).multiplyScalar(0.5);
   }
-  step(dt, t, anchor, eye, flow) {
+  // stiff: how much harder than usual it is held to its anchor (a formation); face: how hard its screen is turned to the eye
+  step(dt, t, anchor, eye, flow, stiff = 1, face = 1) {
     // translation: spring + drag + current
-    tmpV.copy(anchor).sub(this.p).multiplyScalar(this.k);
-    tmpV.addScaledVector(this.v, -this.drag);
+    tmpV.copy(anchor).sub(this.p).multiplyScalar(this.k * stiff);
+    tmpV.addScaledVector(this.v, -this.drag * Math.sqrt(stiff) * (stiff > 1 ? 1.6 : 1));
     const c = this.current(t, new THREE.Vector3()).multiplyScalar(flow);
     tmpV.add(c);
     this.v.addScaledVector(tmpV, dt); this.p.addScaledVector(this.v, dt);
     // rotation: drag, a wandering torque, and a weak pull turning the screen (+z) toward the eye, upright-ish
-    this.w.multiplyScalar(Math.exp(-dt * this.spinDrag));
+    this.w.multiplyScalar(Math.exp(-dt * this.spinDrag * (face > 1 ? 2.5 : 1)));
     this.w.addScaledVector(c, dt * 0.9);
     if (eye) {
       tmpM.lookAt(eye, this.p, UP); tmpQ.setFromRotationMatrix(tmpM);           // a pose facing the eye
       const d = tmpQ.multiply(this.q.clone().invert());                        // the rotation still to go
       if (d.w < 0) { d.x = -d.x; d.y = -d.y; d.z = -d.z; d.w = -d.w; }
       const ang = 2 * Math.acos(Math.min(1, d.w)), s = Math.sqrt(Math.max(1e-8, 1 - d.w * d.w));
-      if (ang > 1e-3) this.w.addScaledVector(tmpV.set(d.x / s, d.y / s, d.z / s), ang * dt * 0.9);
+      if (ang > 1e-3) this.w.addScaledVector(tmpV.set(d.x / s, d.y / s, d.z / s), ang * dt * 0.9 * face);
     }
     const wl = this.w.length();
     if (wl > 1e-5) { tmpQ.setFromAxisAngle(tmpV.copy(this.w).divideScalar(wl), wl * dt); this.q.premultiply(tmpQ).normalize(); }

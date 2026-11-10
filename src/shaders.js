@@ -14,6 +14,8 @@ precision highp sampler2DShadow;
 uniform sampler2DShadow uShadow; uniform mat4 uLVP; uniform vec3 uEye; uniform vec4 uLamp;   // lamp: xyz, on
 // ILMC: the screens around the deck. uSL: position (xyz) and size (w) of each glowing screen, uSC: its light; uAmb: room flash
 uniform vec4 uSL[8]; uniform vec3 uSC[8]; uniform vec3 uAmb;
+// ILMC: the camera's flash (position, colour) and uLin = 1 when the room's camera develops the picture (post.js)
+uniform vec3 uFlP, uFlC; uniform float uLin;
 const vec3 L1 = ${v3(KEY)}, L2 = ${v3(FILL)}, L3 = ${v3(RIM)}, LS = ${v3(STRIP)};
 uniform float uKeyK;
 const vec3 KEYC0 = vec3(2.5, 2.38, 2.2), RIMC = vec3(0.55, 0.62, 0.75), FILLC = vec3(0.05, 0.05, 0.06);
@@ -76,11 +78,14 @@ vec3 shade(vec3 P, vec3 N, vec3 alb, float rough, float metal, float ao) {
     vec3 sp = uSL[i].xyz - P; float sd = length(sp);
     c += brdf(N, V, sp / sd, F0, diff, max(rough, 0.25)) * uSC[i] * (uSL[i].w * uSL[i].w * 6.0) / (sd * sd + 0.01);
   }
+  vec3 fp = uFlP - P; float fd = length(fp);
+  c += brdf(N, V, fp / fd, F0, diff, max(rough, 0.12)) * uFlC / (fd * fd) * (0.55 + 0.45 * ao);
   c += diff * uAmb * ao;
   vec3 F = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - nv, 5.0);
   return c + (env(reflect(-V, N), rough) + screensSeen(P, reflect(-V, N), rough)) * F * ao * (0.45 + 0.55 * sh) + diff * 0.015 * ao;
 }
 vec3 tone(vec3 x) {
+  if (uLin > 0.5) return x;
   x = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
   return pow(x, vec3(1.0 / 2.2)) + (hash(gl_FragCoord.xy) - 0.5) / 255.0;
 }

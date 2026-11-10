@@ -2,53 +2,26 @@
 // Local frame: +y up, screens face +z. Every builder returns { g, screens: [{ mesh, w, h }], tick(dt, fx) }.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from './../vendor/addons/RoundedBoxGeometry.js';
+import { plastic, age, glassOver } from './wear.js';
+import { bake } from './bake.js';
 
 export const rbox = (w, h, d, r = 0.006, seg = 3) => new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4));
 export const rng = (seed) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 
 // ---------- materials ----------
-const NOISE = `
-float h3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float vn(vec3 x) {
-  vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(h3(i), h3(i + vec3(1, 0, 0)), f.x), mix(h3(i + vec3(0, 1, 0)), h3(i + vec3(1, 1, 0)), f.x), f.y),
-             mix(mix(h3(i + vec3(0, 0, 1)), h3(i + vec3(1, 0, 1)), f.x), mix(h3(i + vec3(0, 1, 1)), h3(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-}
-float fbm(vec3 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 3; i++) { s += a * vn(p); p = p * 2.03 + 7.1; a *= 0.5; } return s; }
-`;
-// Plastic that has been through something: lumpy, chipped, grimy in the hollows (the computers in the video are crusted
-// in what looks like plaster and stone). `crust` 0 = clean plastic, 1 = fully encrusted.
-export function crusty(color, crust = 1, rough = 0.78, scale = 9) {
-  const m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0 });
-  m.onBeforeCompile = (s) => {
-    s.uniforms.uCrust = { value: crust }; s.uniforms.uScale = { value: scale };
-    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vObj; varying mat3 vNM;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObj = position; vNM = normalMatrix;');
-    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vObj; varying mat3 vNM; uniform float uCrust, uScale;' + NOISE)
-      .replace('#include <map_fragment>', `#include <map_fragment>
-        float hC = vn(vObj * uScale) * 0.66 + vn(vObj * uScale * 2.03) * 0.34;
-        float grime = smoothstep(0.5, 0.8, vn(vObj * uScale * 0.6 + 3.0));
-        diffuseColor.rgb *= mix(1.0, mix(1.0, 0.7, grime) * (0.9 + 0.14 * hC), uCrust);`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        {   // lumps: the gradient of the crust height, taken in object space, so it is smooth at any distance
-          vec3 q = vObj * uScale; float e = 0.08, h0 = vn(q) + 0.5 * vn(q * 2.03 + 7.1);
-          vec3 gr = vec3(vn(q + vec3(e, 0, 0)) + 0.5 * vn((q + vec3(e, 0, 0)) * 2.03 + 7.1), vn(q + vec3(0, e, 0)) + 0.5 * vn((q + vec3(0, e, 0)) * 2.03 + 7.1), vn(q + vec3(0, 0, e)) + 0.5 * vn((q + vec3(0, 0, e)) * 2.03 + 7.1));
-          gr = (gr - h0) / e * 0.66;
-          gr = normalize(vNM * gr + 1e-5) * length(gr);
-          normal = normalize(normal - (gr - dot(gr, normal) * normal) * 0.35 * uCrust);
-        }`);
-  };
-  m.customProgramCacheKey = () => 'crusty2';
-  return m;
+// Aged plastic now comes from wear.js (shared maps, sampled in each part's own space). `crust` here is how far gone it is:
+// 0 = kept nicely, 1 = yellowed, dusty and scuffed. The mineral crust of the frankencomputers is wear.js's `crust`.
+export function crusty(color, crust = 1, rough = 0.6) {
+  return plastic(color, rough, { age: 0.25 + 0.4 * crust, dust: 0.2 + 0.4 * crust, wear: 0.3 + 0.5 * crust });
 }
 export const MAT = {
-  beige: () => crusty(0xd8cfb7, 0.85),
-  platinum: () => crusty(0xe2ddd0, 0.25, 0.6, 30),
-  black: () => new THREE.MeshStandardMaterial({ color: 0x141416, roughness: 0.55 }),
+  beige: () => crusty(0xd8cfb7, 0.85, 0.5),
+  platinum: () => crusty(0xe2ddd0, 0.4, 0.45),
+  black: () => plastic(0x161618, 0.5, { age: 0, dust: 0.5, wear: 0.5 }),
   blackGloss: () => new THREE.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.25 }),
-  silver: () => new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.32, metalness: 0.9 }),
-  white: () => new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.35 }),
-  grey: () => new THREE.MeshStandardMaterial({ color: 0x55585e, roughness: 0.5 }),
+  silver: () => age(new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.32, metalness: 0.9 }), { age: 0, dust: 0.3, wear: 0.6 }),
+  white: () => plastic(0xeeeeea, 0.35, { age: 0.3, dust: 0.3, wear: 0.5 }),
+  grey: () => plastic(0x55585e, 0.5, { age: 0, dust: 0.4, wear: 0.4 }),
   pcb: () => new THREE.MeshStandardMaterial({ color: 0x1d3a26, roughness: 0.55, metalness: 0.1 }),
   pcbDark: () => new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.5, metalness: 0.2 }),
   orange: () => new THREE.MeshStandardMaterial({ color: 0xe5561d, roughness: 0.45 }),
@@ -56,10 +29,11 @@ export const MAT = {
   glass: () => new THREE.MeshPhysicalMaterial({ color: 0x050607, roughness: 0.08, metalness: 0, clearcoat: 1 }),
 };
 
-// a screen: a slightly bulged quad (CRTs) or a flat one; the material is assigned by the screen system
-export function screenQuad(w, h, bulge = 0) {
+// a screen: a slightly bulged quad (CRTs) or a flat one; the material is assigned by the screen system. A quad laid over
+// or under a picture of size rw x rh passes it, so all the layers of one tube follow the same curved surface.
+export function screenQuad(w, h, bulge = 0, rw = w, rh = h) {
   const g = new THREE.PlaneGeometry(w, h, bulge ? 16 : 1, bulge ? 12 : 1), p = g.attributes.position;
-  if (bulge) for (let i = 0; i < p.count; i++) { const x = p.getX(i) / (w / 2), y = p.getY(i) / (h / 2); p.setZ(i, bulge * (1 - 0.5 * (x * x + y * y))); }
+  if (bulge) for (let i = 0; i < p.count; i++) { const x = p.getX(i) / (rw / 2), y = p.getY(i) / (rh / 2); p.setZ(i, bulge * (1 - 0.5 * (x * x + y * y))); }
   g.computeVertexNormals();
   return g;
 }
@@ -74,7 +48,7 @@ export function fan(size, mat, standoff = 0) {
   sq.moveTo(-h + c, -h); sq.lineTo(h - c, -h); sq.quadraticCurveTo(h, -h, h, -h + c); sq.lineTo(h, h - c); sq.quadraticCurveTo(h, h, h - c, h); sq.lineTo(-h + c, h); sq.quadraticCurveTo(-h, h, -h, h - c); sq.lineTo(-h, -h + c); sq.quadraticCurveTo(-h, -h, -h + c, -h);
   const throat = new THREE.Path(); throat.absarc(0, 0, r, 0, TAU, true); sq.holes.push(throat);
   for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const p = new THREE.Path(); p.absarc(x * size * 0.4, y * size * 0.4, size * 0.035, 0, TAU, true); sq.holes.push(p); }
-  const fg = new THREE.ExtrudeGeometry(sq, { depth: d, bevelEnabled: true, bevelThickness: size * 0.01, bevelSize: size * 0.01, bevelSegments: 2, curveSegments: 32 }); fg.translate(0, 0, -d / 2);
+  const fg = new THREE.ExtrudeGeometry(sq, { depth: d, bevelEnabled: true, bevelThickness: size * 0.01, bevelSize: size * 0.01, bevelSegments: 1, curveSegments: 16 }); fg.translate(0, 0, -d / 2);
   g.add(mesh(fg, mat));
   const dark = new THREE.MeshStandardMaterial({ color: 0x0d0d0f, roughness: 0.7 });
   const mount = mesh(new THREE.CylinderGeometry(r * 0.36, r * 0.36, d * 0.25, 32), mat); mount.rotation.x = Math.PI / 2; mount.position.z = -d * 0.38; g.add(mount);
@@ -82,7 +56,7 @@ export function fan(size, mat, standoff = 0) {
   if (standoff > 0) {                           // screwed to whatever is behind it: four metal posts from the corner holes
     const post = new THREE.CylinderGeometry(size * 0.028, size * 0.028, standoff, 12); post.rotateX(Math.PI / 2);
     const back = -d / 2 - size * 0.01 - standoff / 2;
-    for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) g.add(mesh(post, MAT.silver(), x * size * 0.4, y * size * 0.4, back));
+    const sv = MAT.silver(); for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) g.add(mesh(post, sv, x * size * 0.4, y * size * 0.4, back));
   }
   const rot = new THREE.Group(); g.add(rot);
   const hub = mesh(new THREE.CylinderGeometry(r * 0.32, r * 0.33, d * 0.6, 32), mat); hub.rotation.x = Math.PI / 2; hub.position.z = d * 0.05; rot.add(hub);
@@ -95,11 +69,12 @@ export function fan(size, mat, standoff = 0) {
   for (let k = 1; k <= 8; k++) bs.lineTo(...pol(r1, -0.04 + k * 0.06));
   bs.quadraticCurveTo(...pol(r * 0.64, 0.46), ...pol(r0, 0.24));
   for (let k = 1; k <= 6; k++) bs.lineTo(...pol(r0, 0.24 - k * 0.0933));
-  const bg = new THREE.ExtrudeGeometry(bs, { depth: size * 0.008, bevelEnabled: true, bevelThickness: size * 0.004, bevelSize: size * 0.004, bevelSegments: 2, curveSegments: 12 });
+  const bg = new THREE.ExtrudeGeometry(bs, { depth: size * 0.008, bevelEnabled: true, bevelThickness: size * 0.004, bevelSize: size * 0.004, bevelSegments: 1, curveSegments: 6 });
   bg.translate(0, 0, -size * 0.004); bg.applyMatrix4(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(Math.cos(0.12), Math.sin(0.12), 0), 0.5));
   for (let i = 0; i < 7; i++) { const b = mesh(bg, mat); b.rotation.z = i / 7 * TAU; b.position.z = d * 0.05; rot.add(b); }
   const blurMat = new THREE.MeshBasicMaterial({ color: 0x18181b, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
   const blur = mesh(new THREE.RingGeometry(r0, r1, 48), blurMat); blur.position.z = d * 0.2; g.add(blur);
+  bake(g, [rot, blur]); bake(rot, []);
   let last = 0, t = performance.now();
   return {
     g, rot,
@@ -466,6 +441,7 @@ export function ipodTouch(s = 1) {
   const sq = new THREE.Shape(rr(3.2 * mm, 3.2 * mm, 0.7 * mm).getPoints(24)); sq.holes.push(new THREE.Path(rr(2.6 * mm, 2.6 * mm, 0.45 * mm).getPoints(24).reverse()));
   const sqm = new THREE.Mesh(new THREE.ShapeGeometry(sq), new THREE.MeshBasicMaterial({ color: 0x6b6e74 })); sqm.position.set(0, -46 * mm, 0.6 * mm); g.add(sqm);
   const scr = new THREE.Mesh(new THREE.PlaneGeometry(49.3 * mm, 74 * mm), null); scr.position.set(0, 1 * mm, 0.5 * mm); g.add(scr);
+  const gl = glassOver(scr, 58 * mm, 104 * mm, 0, 0.25 * mm, {}); gl.position.y = -1 * mm; g.add(gl);      // the front glass, over the picture
   // the case: a soft sleeve behind and around it, a lip over the front edge
   const sleeve = new THREE.Mesh(ext(rr(62 * mm, 110 * mm, 10 * mm), 8.5 * mm, 2.2 * mm, 6), yellow); sleeve.position.z = -10.7 * mm; g.add(sleeve);
   const lip = rr(66 * mm, 114 * mm, 11 * mm); lip.holes.push(new THREE.Path(rr(58.6 * mm, 106 * mm, 7.2 * mm).getPoints(40).reverse()));
@@ -487,6 +463,7 @@ export function ipodTouch(s = 1) {
     const st = new THREE.Shape(); st.moveTo(-8 * mm, 0); st.quadraticCurveTo(0, 2.4 * mm, 8 * mm, 0); st.quadraticCurveTo(0, -2.4 * mm, -8 * mm, 0);
     const m = new THREE.Mesh(ext(st, 0.3 * mm, 0.2 * mm, 2), brown); m.rotation.set(0, Math.PI, a); m.position.set(x * mm, y * mm, -12.8 * mm); g.add(m);
   }
+  bake(g, [scr, gl]);
   return { g: root, screens: [{ mesh: scr, w: 49.3 * mm, h: 74 * mm, fixed: 16 }], kind: 'ipod', size: 0.03, tick() {} };
 }
 

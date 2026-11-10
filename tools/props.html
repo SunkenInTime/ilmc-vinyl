@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Floor kit</title>
+<script type="importmap">{ "imports": { "three": "../src/vendor/three.module.min.js" } }</script>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Pinyon+Script&display=swap" rel="stylesheet">
+<style>
+  :root { --fg: #e8e4dd; --dim: #9a958d; --acc: #ffe10a; }
+  html, body { margin: 0; height: 100%; background: #141416; color: var(--fg); font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; overflow: hidden; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 12px; top: 10px; background: rgba(12,12,13,.82); padding: 8px 10px; border-radius: 4px; max-width: 520px; }
+  #hud b { color: var(--acc); font-weight: 600; }
+  #hud button { font: inherit; background: #2a2a2e; color: var(--fg); border: 1px solid #444; border-radius: 3px; padding: 2px 8px; margin: 4px 4px 0 0; cursor: pointer; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .lab { position: absolute; transform: translate(-50%, 0); white-space: nowrap; font-size: 10.5px; color: #111; background: rgba(255,255,255,.82); padding: 1px 4px; border-radius: 2px; }
+  .lab i { font-style: normal; color: #555; }
+  .lab.wait { background: rgba(255,225,10,.85); }
+  .lab.gone { background: rgba(255,80,80,.9); }
+  .lab.surf { background: rgba(170,210,255,.9); }
+</style>
+</head>
+<body>
+<div id="hud"><div id="sum">loading…</div>
+  <button data-v="top">top (cover)</button><button data-v="room">room, 50°</button><button data-v="all">whole kit</button><button id="lab">labels</button></div>
+<div id="labels"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from '../src/vendor/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from '../src/vendor/addons/RoomEnvironment.js';
+import { Props } from '../src/ilmc/props.js';
+
+// the viewer: every prop and surface laid out on a floor with a 10 cm grid, under a hard key with shadows and a
+// neutral fill, each named with its triangles and download. ?view=top|room|all picks the camera.
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setPixelRatio(Math.min(2, devicePixelRatio)); r.setSize(innerWidth, innerHeight);
+r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;
+r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap;
+document.body.prepend(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x141416);
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.25;
+
+// floor with a 10 cm grid (1 m lines heavier)
+const gc = document.createElement('canvas'); gc.width = gc.height = 1000; const gx = gc.getContext('2d');
+gx.fillStyle = '#7d7b78'; gx.fillRect(0, 0, 1000, 1000);
+for (let i = 0; i <= 10; i++) { gx.fillStyle = i % 10 ? 'rgba(0,0,0,.28)' : 'rgba(0,0,0,.6)'; gx.fillRect(i * 100 - (i % 10 ? 1 : 2), 0, i % 10 ? 2 : 4, 1000); gx.fillRect(0, i * 100 - (i % 10 ? 1 : 2), 1000, i % 10 ? 2 : 4); }
+const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(40, 40); gt.anisotropy = 8; gt.colorSpace = THREE.SRGBColorSpace;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: gt, roughness: 0.9 }));
+floor.receiveShadow = true; scene.add(floor);
+
+// a hard key (a flash, high and a little off the lens) and a neutral fill
+const key = new THREE.DirectionalLight(0xffffff, 2.6); key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.01; key.shadow.radius = 1;
+scene.add(key, key.target, new THREE.HemisphereLight(0xdfe6ee, 0x3a3631, 0.9));
+const fitShadow = (b) => { const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3()), R = Math.max(s.x, s.z) * 0.6 + 0.3;
+  key.target.position.copy(c); key.position.copy(c).add(new THREE.Vector3(-1.2, 3.2, 1.4));
+  Object.assign(key.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 0.1, far: 10 }); key.shadow.camera.updateProjectionMatrix(); };
+
+const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.02, 60);
+const ctl = new OrbitControls(cam, r.domElement); ctl.enableDamping = true; ctl.target.set(1.5, 0, 1.2);
+
+// scale references: the deck's plinth and a 0.4 m CRT, as plain grey blocks
+const refMat = new THREE.MeshStandardMaterial({ color: 0x5b5e66, roughness: 0.6 });
+const block = (w, h, d) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0), refMat); m.castShadow = m.receiveShadow = true; return m; };
+
+const kit = new Props({ base: '../assets/ilmc/', renderer: r });
+const t0 = performance.now(), arrivals = [], labels = [];
+const labEl = document.getElementById('labels');
+const label = (text, cls, at) => { const d = document.createElement('div'); d.className = 'lab ' + (cls || ''); d.innerHTML = text; labEl.appendChild(d); const l = { d, at }; labels.push(l); return l; };
+const kb = (b) => b ? (b / 1024).toFixed(0) + ' KB' : 'code';
+const info = (n, s) => `${n} <i>${s.tris ? s.tris.toLocaleString() + ' tris' : ''} · ${kb(s.bytes)} · ${Math.round(s.w * 100)}×${Math.round(s.d * 100)}×${Math.round(s.h * 100)} cm</i>`;
+
+kit.load({ first: ['tv_black', 'boombox'] });
+await kit.listed;
+const names = kit.names().filter((n) => kit.spec(n));
+// shelf packing: rows 4.2 m long, models first then the made things, biggest first within each
+const rows = [], W = 6.4, gap = 0.16; let x = 0, z = 0, rowD = 0;
+const order = [...names].sort((a, b) => { const A = kit.spec(a), B = kit.spec(b); return (!!A.made - !!B.made) || (B.w * B.d - A.w * A.d); });
+const slots = {};
+for (const n of order) {
+  const s = kit.spec(n), w = Math.max(s.w, 0.12), d = Math.max(s.d, 0.12);
+  if (x + w > W) { x = 0; z += rowD + gap + 0.06; rowD = 0; }
+  slots[n] = new THREE.Vector3(x + w / 2, 0, z + d / 2); x += w + gap; rowD = Math.max(rowD, d);
+}
+z += rowD + gap + 0.1;
+const plinth = block(0.455, 0.1, 0.38); plinth.position.set(0.25, 0, z + 0.2); scene.add(plinth); label('deck plinth 45.5×38 cm', 'surf', new THREE.Vector3(0.25, 0, z + 0.41));
+const crt = block(0.4, 0.36, 0.4); crt.position.set(0.85, 0, z + 0.2); scene.add(crt); label('CRT 40 cm', 'surf', new THREE.Vector3(0.85, 0, z + 0.41));
+// surfaces: 0.6 m tiles
+const SURF = Object.keys(kit.manifest?.surfaces || {}), tint = { jersey: 0xf2f0ea, fleece: 0x8d9097, teddy: 0xd9b48a };
+SURF.forEach((n, i) => { const t = kit.floor(n, 0.6, 0.6, tint[n] ? { color: tint[n] } : undefined), px = 1.4 + (i % 4) * 0.7, pz = z + 0.3 + Math.floor(i / 4) * 0.75;
+  t.position.set(px, 0.001, pz); scene.add(t); const s = kit.manifest.surfaces[n]; label(`${n} <i>${s.px}px · ${s.tile} m tile · ${kb(s.bytes)}</i>`, 'surf', new THREE.Vector3(px, 0, pz + 0.31)); });
+const extent = new THREE.Box3(new THREE.Vector3(-0.2, 0, -0.2), new THREE.Vector3(W + 0.2, 0.5, z + 0.3 + Math.ceil(SURF.length / 4) * 0.75)); fitShadow(extent);
+
+for (const n of names) {
+  const p = slots[n], s = kit.spec(n), l = label(info(n, s), s.made ? '' : 'wait', new THREE.Vector3(p.x, 0, p.z + Math.max(s.d, 0.12) / 2 + 0.01));
+  kit.when(n).then((o) => {
+    if (!o) { l.d.className = 'lab gone'; l.d.innerHTML = n + ' <i>failed</i>'; return; }
+    o.position.copy(p); scene.add(o); l.d.className = 'lab'; l.d.innerHTML = info(n, kit.spec(n));
+    arrivals.push({ n, ms: Math.round(performance.now() - t0) });
+  });
+}
+const done = kit.load().then(() => { window.__view.done = true; });
+
+// cameras: straight-ish down like the album cover, and the room's default (about 50° up)
+const VIEWS = {
+  top: { el: 82, az: 0, dist: 3.2, at: [1.4, 0, 1.0] },
+  room: { el: 50, az: -28, dist: 3.4, at: [1.4, 0, 1.0] },
+  all: { el: 72, az: 0, dist: Math.max(W * 1.15 / (2 * Math.tan(17.5 * Math.PI / 180) * innerWidth / innerHeight), extent.max.z * 1.08 / (2 * Math.tan(17.5 * Math.PI / 180))), at: [W / 2, 0, extent.max.z / 2 - 0.1] },
+};
+// v: 'top' | 'room' | 'all', optionally aimed: 'top@1.5,2' looks at x 1.5, z 2; 'room@hoodie' at that prop; '~2' sets the distance
+function setView(v) {
+  const [view, dist] = v.split('~'), [name, aim] = view.split('@'), V = { ...(VIEWS[name] || VIEWS.all) };
+  if (aim) { const s = slots[aim]; V.at = s ? [s.x, 0, s.z] : [...aim.split(',').map(Number)].reduce((a, n, i) => (a[i ? 2 : 0] = n, a), [0, 0, 0]); }
+  if (dist) V.dist = +dist;
+  const e = V.el * Math.PI / 180, a = V.az * Math.PI / 180;
+  ctl.target.set(...V.at); cam.position.set(V.at[0] + V.dist * Math.cos(e) * Math.sin(a), V.dist * Math.sin(e), V.at[2] + V.dist * Math.cos(e) * Math.cos(a)); ctl.update();
+}
+if (q.get('at')) VIEWS.top.at = VIEWS.room.at = q.get('at').split(',').map(Number);
+setView(q.get('view') || 'all');
+document.querySelectorAll('[data-v]').forEach((b) => b.onclick = () => setView(b.dataset.v));
+document.getElementById('lab').onclick = () => { labEl.hidden = !labEl.hidden; };
+if (q.has('nolabels')) labEl.hidden = true;
+
+const sum = document.getElementById('sum'), v = new THREE.Vector3();
+function stats() {
+  let tris = 0, have = 0, bytes = 0; const failed = [];
+  for (const n of names) { const s = kit.spec(n); if (kit.has(n)) { have++; tris += s.tris || 0; } else if (kit.failed.has(n)) failed.push(n); }
+  for (const m of kit.manifest?.models || []) bytes += m.bytes; for (const s of Object.values(kit.manifest?.surfaces || {})) bytes += s.bytes;
+  return { props: names.length, have, failed, tris, bytes, arrivals };
+}
+window.__view = { kit, setView, stats, done: false, scene, cam, slots, VIEWS };
+addEventListener('resize', () => { r.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+r.setAnimationLoop(() => {
+  ctl.update(); r.render(scene, cam);
+  const s = stats();
+  sum.innerHTML = `<b>${s.have}/${s.props}</b> props · ${s.tris.toLocaleString()} tris on the floor · kit download <b>${(s.bytes / 1048576).toFixed(2)} MB</b>${s.failed.length ? ' · failed: ' + s.failed.join(', ') : ''}`;
+  if (labEl.hidden) return;
+  for (const l of labels) { v.copy(l.at).project(cam); const vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1; l.d.style.display = vis ? '' : 'none'; if (vis) { l.d.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; l.d.style.top = ((1 - v.y) / 2 * innerHeight) + 'px'; } }
+});
+</script>
+</body>
+</html>

@@ -1,56 +1,47 @@
-// Every screen in the room. Content is either drawn in the shader (the :3 face, spectrum, tunnel, Y2K wallpaper,
-// snow) or painted into a shared 2D atlas (BIOS, BSOD, system message, DAW, winamp, scope, the cover...).
-// The shader then treats it like glass: CRT curvature, scanlines, phosphor mask, and a power-on collapse.
+// Every screen in the room. Content is drawn in the shader (the :3 face, Y2K wallpaper, tunnel, snow), drawn on the
+// GPU into its own small picture (the visualisers: viz/gpu.js), or painted into a 2D tile (BIOS, BSOD, system message,
+// the cover...). The shader then treats it like a display: a CRT's curved glass, phosphor stripes and scanlines that
+// melt away with distance, darker corners, a degauss wobble when it powers on; an LCD's pixel grid, cool backlight and
+// off-axis washout. One exposure for all of them, with highlights rolled off so bright pictures keep their colour.
 import * as THREE from 'three';
 import { art } from './art.js';
 import { systemMessage } from './win98.js';
+import { Viz } from './viz/gpu.js';
+import { FACE_GLSL, Face, Voice } from './viz/face.js';
+import { win, sunken, button, SANS } from './viz/era.js';
+export { FACE_GLSL };
 
 export const MODE = { OFF: 0, FACE: 1, BARS: 2, BLISS: 3, TILE: 4, TUNNEL: 5, SNOW: 6, FACES: 7 };
-export const TILE = { BIOS: 0, BSOD: 1, SYSMSG: 2, COVER: 3, AMP: 4, SCOPE: 5, DAW: 6, WORD: 7, WAVE: 8, DESKTOP: 9, COPY: 10, UEFI: 11, HEART: 12, TRIPLE: 13, CHAT: 14, NAME: 15, IPOD: 16, VFD: 17 };
+// pictures by id. AMP, SCOPE and DAW kept their ids and are now the GPU's Winamp, oscilloscope and FL step sequencer
+export const TILE = { BIOS: 0, BSOD: 1, SYSMSG: 2, COVER: 3, AMP: 4, SCOPE: 5, DAW: 6, WORD: 7, WAVE: 8, DESKTOP: 9, COPY: 10, UEFI: 11, HEART: 12, TRIPLE: 13, CHAT: 14, NAME: 15, IPOD: 16, VFD: 17,
+  ANALYZER: 18, VECTOR: 19, WATERFALL: 20, MILK: 21, METERS: 22,
+  // the period software (viz/era.js)
+  PIPES: 23, STARS: 24, MYSTIFY: 25, MAZE: 26, BOUNCE: 27, DEFRAG: 28, COPY98: 29, DOWNLOAD: 30, BURN: 31, SCANDISK: 32, SOLITAIRE: 33, MINES: 34, WEBCAM: 35, MPLAYER: 36 };
+const GPU = { [TILE.AMP]: 'player', [TILE.SCOPE]: 'scope', [TILE.DAW]: 'steps', [TILE.ANALYZER]: 'analyzer', [TILE.VECTOR]: 'vector', [TILE.WATERFALL]: 'waterfall', [TILE.MILK]: 'milk', [TILE.METERS]: 'meters',
+  [TILE.PIPES]: 'pipes', [TILE.STARS]: 'stars', [TILE.MYSTIFY]: 'mystify', [TILE.MAZE]: 'maze', [TILE.BOUNCE]: 'bounce', [TILE.DEFRAG]: 'defrag', [TILE.COPY98]: 'copy', [TILE.DOWNLOAD]: 'download',
+  [TILE.BURN]: 'burn', [TILE.SCANDISK]: 'scandisk', [TILE.SOLITAIRE]: 'solitaire', [TILE.MINES]: 'mines', [TILE.WEBCAM]: 'webcam', [TILE.MPLAYER]: 'mplayer' };
+// roughly what each gives off, for the lights
+const GLOW = { [TILE.PIPES]: [0.25, 0.22, 0.25], [TILE.STARS]: [0.08, 0.08, 0.1], [TILE.MYSTIFY]: [0.2, 0.15, 0.25], [TILE.MAZE]: [0.4, 0.25, 0.2], [TILE.BOUNCE]: [0.08, 0.08, 0.08], [TILE.SOLITAIRE]: [0.15, 0.45, 0.15],
+  [TILE.SCANDISK]: [0.1, 0.1, 0.6], [TILE.MPLAYER]: [0.45, 0.4, 0.5], [TILE.WEBCAM]: [0.4, 0.45, 0.45] };
+// The wall: every screen in the stack (not the iPod or the deck's own display) shows its piece of one picture laid over
+// the whole frame, sampled by where each pixel lands in the camera's view, so the pile reads as one display with bezels.
+//   screens.wall.pic = WALL.FACE; screens.wall.amount = 0..1   set each frame from the choreography, or
+//   screens.wallFor(WALL.FACE, secs, fade = 0.3)               a one-off moment: fades in, holds, fades out
+// WALL.VIZ a giant LED analyser across the frame; FACE the :3 face (blinks with screens.wall.blink = 1);
+// WASH a colour wash sweeping across on the beat; WORD the sung word (screens.word) in huge type; MILK the MilkDrop warp.
+// screens.exposure is the level of the screens' white, linear (default 0.85); highlights roll off above 60 % of it.
+export const WALL = { VIZ: 0, FACE: 1, WASH: 2, WORD: 3, MILK: 4 };
 // what's playing, for the screens that show it (the visitor's file, or the record from the shelf)
 const trk = () => ({ title: art.title || 'I Love My Computer', artist: art.artist || 'Ninajirachi', album: art.album || art.title || 'I Love My Computer' });
 const COLS = 4, ROWS = 5, TW = 384, TH = 288;
-
-export const FACE_GLSL = `
-float sdTri(vec2 p, float r) { const float k = 1.7320508; p.x = abs(p.x) - r; p.y = p.y + r / k;
-  if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) / 2.0; p.x -= clamp(p.x, -2.0 * r, 0.0); return -length(p) * sign(p.y); }
-float sdBox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
-// the :3 face: a chrome downward triangle, two slot eyes, a cat mouth
-vec3 face(vec2 p, vec3 bg) {
-  float s = 1.0 + 0.06 * uKick; p /= s;
-  p.y -= 0.03;
-  vec2 q = vec2(p.x * 0.92, -p.y * 1.05 + 0.08);
-  float d = sdTri(q, 0.36) - 0.07;
-  float aa = fwidth(d) * 1.2;
-  vec3 c = bg;
-  // drop shadow behind the plate
-  c *= 1.0 - 0.5 * smoothstep(0.08, -0.02, sdTri(q + vec2(-0.02, 0.03), 0.36) - 0.07);
-  if (d < 0.02) {
-    float bev = clamp(-d / 0.06, 0.0, 1.0);
-    vec2 gdir = normalize(vec2(dFdx(d), dFdy(d)) + 1e-6);
-    float lit = 0.5 + 0.5 * dot(-gdir, normalize(vec2(-0.6, 0.8)));
-    // chrome: a horizon line reflected in the plate, plus a hot rim on the bevel
-    float y = p.y + 0.15 * p.x;
-    vec3 chrome = mix(vec3(0.95, 0.97, 1.0), vec3(0.42, 0.45, 0.52), smoothstep(-0.04, 0.12, y));
-    chrome = mix(chrome, vec3(0.18, 0.2, 0.25), smoothstep(-0.02, -0.12, y) * 0.6);
-    chrome += 0.12 * sin(p.x * 18.0 + p.y * 6.0);
-    chrome = mix(chrome * (0.55 + 0.6 * lit), chrome, bev);
-    c = mix(c, chrome, smoothstep(aa, -aa, d));
-    // eyes (blink: squash)
-    float bl = 1.0 - 0.9 * uBlink;
-    float e = min(sdBox(p - vec2(-0.11, 0.07), vec2(0.035, 0.065 * bl), 0.012), sdBox(p - vec2(0.11, 0.07), vec2(0.035, 0.065 * bl), 0.012));
-    c = mix(c, vec3(0.06, 0.065, 0.08), smoothstep(aa, -aa, e));
-    c = mix(c, vec3(0.6, 0.65, 0.75), smoothstep(aa, -aa, e + 0.008) * smoothstep(0.0, 0.03, p.y - 0.07 + 0.04) * 0.0);
-    // mouth: two lower half-circles, opening with the mids
-    float o = 0.02 + 0.03 * uMid;
-    vec2 m1 = p - vec2(-0.033, -0.04), m2 = p - vec2(0.033, -0.04);
-    float arc = min(abs(length(m1) - 0.033) - 0.009 + step(0.0, m1.y) * 1.0, abs(length(m2) - 0.033) - 0.009 + step(0.0, m2.y) * 1.0);
-    c = mix(c, vec3(0.06, 0.065, 0.08), smoothstep(aa, -aa, arc));
-    c = mix(c, vec3(0.06), smoothstep(aa, -aa, sdBox(p - vec2(0.0, -0.1), vec2(0.03, o * 0.5), 0.01)) * step(0.35, uMid));
-  }
-  return c;
-}
-`;
+// the chorus' temperaments: how late each feels the lead's mood, how big it sings, hops, blushes, how heavy its lids are,
+// and the moods it takes its own way
+const TEMPER = [
+  { lag: 0.5, amp: 0.8, bounce: 0.7, blush: 0.35, lids: 0.92, blinks: 1.3, map: { curious: 'shy', declare: 'shy', wanting: 'shy' } },          // bashful
+  { lag: 0.12, amp: 1.25, bounce: 1.6, blush: 0, lids: 1.12, blinks: 0.7, map: { curious: 'delighted', shy: 'delighted', blissful: 'joy' } },  // eager
+  { lag: 0.8, amp: 0.7, bounce: 0.5, blush: 0.1, lids: 0.72, blinks: 1.6, map: { joy: 'blissful', frantic: 'overwhelmed', declare: 'blissful' } },   // dozy
+  { lag: 0.3, amp: 1, bounce: 1, blush: 0.2, lids: 1, blinks: 1, map: { overwhelmed: 'love', curious: 'love' } },                          // smitten
+];
 
 export const SKY_GLSL = `
 float sh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -113,13 +104,22 @@ vec3 y2k(vec3 d, float t, float scene, float D) {
 
 const FRAG = `
 precision highp float;
-uniform sampler2D uAudio, uAtlas;
-uniform float uTear; uniform vec4 uTile; uniform int uMode; uniform float uTime, uBeat, uFlash, uSeed, uAspect, uSwitch, uCrt, uBright, uKick, uMid, uLevel, uInvert, uBlink, uScene, uHue;
-varying vec2 vUv;
+uniform sampler2D uAudio, uAtlas, uWallTex;
+uniform float uTear; uniform vec4 uTile; uniform int uMode; uniform float uTime, uBeat, uFlash, uSeed, uAspect, uSwitch, uPower, uCrt, uBright, uKick, uMid, uLevel, uInvert, uBlink, uScene, uHue;
+uniform float uExposure, uCalm, uWall; uniform int uWallPic; uniform vec4 uVP;
+uniform vec4 uFE, uFM, uFX, uFY, uLE, uLM, uLX, uLY;   // this screen's face, and the lead's (for the wall)
+varying vec2 vUv; varying vec3 vN, vV;
 ${SKY_GLSL}
 float spec(float x) { return texture2D(uAudio, vec2(x, 0.125)).r; }
 float wav(float x) { return texture2D(uAudio, vec2(x, 0.375)).r; }
 ${FACE_GLSL}
+// one of a crowd of faces: each blinks on its own, looks a little elsewhere and sings a little more or less
+vec3 faceCell(vec2 p, vec3 bg, vec2 id, vec4 E, vec4 M, vec4 X, vec4 Y) {
+  float h = fhash(id + 3.7), bt = fract(uTime * (0.21 + 0.1 * h) + h * 7.0);
+  if (E.w < 0.5) E.z *= bt > 0.97 ? abs(bt - 0.985) / 0.015 : 1.0;
+  E.xy += vec2(h - 0.5, fract(h * 13.0) - 0.5) * 0.8; M.x *= 0.6 + 0.6 * fract(h * 31.0); X.w += (fract(h * 7.0) - 0.5) * 0.2;
+  return face(p, bg, E, M, X, Y, uTime + h * 10.0);
+}
 vec3 wallpaper(vec2 uv, float t, float scene) {
   vec3 sky = scene > 2.5 ? mix(vec3(1.0, 0.62, 0.42), vec3(0.16, 0.22, 0.62), uv.y) : scene > 1.5 ? vec3(0.02, 0.01, 0.08) : mix(vec3(0.62, 0.82, 1.0), vec3(0.06, 0.3, 0.86), uv.y);
   if (scene > 1.5 && scene < 2.5) return sky + step(0.985, sh(floor(uv * vec2(90.0, 60.0)))) * vec3(1.0);
@@ -129,106 +129,189 @@ vec3 wallpaper(vec2 uv, float t, float scene) {
   if (uv.y < hz) sky = scene > 0.5 && scene < 1.5 ? mix(vec3(0.0, 0.14, 0.4), vec3(0.05, 0.42, 0.72), sn(vec2(uv.x * 20.0, uv.y * 40.0 - t * 2.0))) : mix(vec3(0.42, 0.78, 0.18), vec3(0.13, 0.45, 0.07), (hz - uv.y) * 3.0);
   return sky;
 }
+vec3 tex(vec2 uv, float bias) { return texture2D(uAtlas, uTile.xy + clamp(uv, 0.002, 0.998) * uTile.zw, bias).rgb; }
 vec3 content(vec2 uv) {
   vec2 p = (uv - 0.5) * vec2(uAspect, 1.0);
   if (uMode == 1) {
     vec3 bg = mix(vec3(0.16, 0.165, 0.17), vec3(0.08), length(p)) ;
     if (uScene > 0.5) bg = mix(vec3(0.1, 0.35, 0.95), vec3(0.02, 0.1, 0.5), length(p));
-    return face(p, bg);
-  }
-  if (uMode == 2) {
-    float n = 24.0, i = floor(uv.x * n), f = fract(uv.x * n), v = spec((i + 0.5) / n * 0.8 + 0.02);
-    float seg = step(0.2, fract(uv.y * 22.0)), on = step(uv.y, v) * step(0.12, f) * step(f, 0.88) * seg;
-    vec3 col = mix(vec3(0.1, 1.0, 0.35), vec3(1.0, 0.85, 0.1), smoothstep(0.45, 0.7, uv.y)); col = mix(col, vec3(1.0, 0.15, 0.25), smoothstep(0.75, 0.9, uv.y));
-    if (uHue > 0.5) col = mix(vec3(0.25, 0.7, 1.0), vec3(1.0, 0.3, 0.65), uv.y);
-    return col * on + vec3(0.02, 0.03, 0.05);
+    return face(p * 0.8, bg, uFE, uFM, uFX, uFY, uTime);           // a size up: it fills its screen, so it reads across the room
   }
   if (uMode == 3) return wallpaper(uv, uTime + uSeed * 10.0, floor(fract(uSeed * 7.3) * 4.0));
-  if (uMode == 4) { return texture2D(uAtlas, uTile.xy + clamp(uv, 0.002, 0.998) * uTile.zw).rgb; }
+  if (uMode == 4 || uMode == 8) return tex(uv, 0.0);
   if (uMode == 5) {
-    float r = length(p), a = atan(p.y, p.x), z = 0.25 / max(r, 0.02) + uTime * (0.6 + 2.0 * uLevel);
-    float stripes = step(0.5, fract(z * 1.0 + a / 6.2832 * 6.0 * (fract(uSeed) > 0.5 ? 1.0 : -1.0)));
+    // stripes rushing out of the middle; where they get finer than a pixel (the centre) they melt to their average
+    float r = length(p), a = atan(p.y, p.x), z = 0.25 / max(r, 0.02) + uTime * (0.6 + 2.0 * uLevel * (1.0 - 0.7 * uCalm));
+    float zz = z + a / 6.2832 * 6.0 * (fract(uSeed) > 0.5 ? 1.0 : -1.0), w = min(fwidth(z) * 1.5, 0.5);
+    float stripes = mix(smoothstep(0.5 - w, 0.5 + w, abs(fract(zz) - 0.5) * 2.0), 0.5, smoothstep(0.25, 0.5, w));
     vec3 c1 = vec3(1.0, 0.25, 0.65), c2 = vec3(0.2, 0.55, 1.0);
     vec3 c = mix(c1, c2, stripes) * smoothstep(0.0, 0.25, r) * (0.6 + 0.8 * spec(fract(a / 6.2832 + 0.5) * 0.6));
     return c + vec3(1.0) * smoothstep(0.06, 0.0, r) * uKick;
   }
-  if (uMode == 6) { float n = sh(floor(uv * vec2(160.0, 120.0)) + floor(uTime * 30.0)); return vec3(n * 0.8 + 0.1); }
+  if (uMode == 6) { float n = sh(floor(uv * vec2(160.0, 120.0)) + floor(uTime * mix(30.0, 6.0, uCalm))); return vec3(mix(n * 0.8 + 0.1, 0.25 + n * 0.2, uCalm)); }
   if (uMode == 7) {
     vec2 g = p * 3.0 + vec2(uTime * 0.3, uBeat * 0.25); vec2 id = floor(g); vec2 f = fract(g) - 0.5;
     vec3 bg = mod(id.x + id.y, 2.0) < 1.0 ? vec3(1.0, 0.3, 0.65) : vec3(0.2, 0.5, 1.0);
-    return face(f * 0.9 * vec2(1.0, 1.0), bg * 0.9);
+    return faceCell(f * 0.9, bg * 0.9, id, uFE, uFM, uFX, uFY);
   }
   return vec3(0.0);
 }
+// the wall's picture at q (0..1 across the camera's frame)
+vec3 wallPic(vec2 q) {
+  float asp = uVP.z / uVP.w; vec2 p = (q - 0.5) * vec2(asp, 1.0);
+  if (uWallPic == 0) {
+    float N = 16.0, bi = floor(q.x * N), rows = 10.0, ri = floor(q.y * rows);
+    vec2 f = vec2(fract(q.x * N), fract(q.y * rows)), fw = fwidth(q * vec2(N, rows));
+    float v = 0.0; for (int k = 0; k < 6; k++) v = max(v, spec((bi * 6.0 + float(k) + 6.0) / 104.0));
+    float lvl = (ri + 0.5) / rows, on = step(lvl, v * 1.08);
+    vec2 e = smoothstep(vec2(0.07), vec2(0.07) + fw, f) * smoothstep(vec2(0.07), vec2(0.07) + fw, 1.0 - f);
+    vec3 col = lvl < 0.6 ? vec3(0.1, 1.0, 0.25) : lvl < 0.82 ? vec3(1.0, 0.78, 0.05) : vec3(1.0, 0.1, 0.1);
+    return col * e.x * e.y * (0.05 + 0.95 * on);
+  }
+  // a field of faces, each about a screen big, drifting across the whole stack together (one face over the whole
+  // frame only ever lands as flat chrome on the scattered screens; a moving field crosses the bezels and reads as one)
+  if (uWallPic == 1) {
+    vec2 g = p * 4.2 + vec2(uTime * 0.35, 0.0), id = floor(g), f = fract(g) - 0.5;
+    vec3 bg = mod(id.x + id.y, 2.0) < 1.0 ? vec3(1.0, 0.3, 0.65) : vec3(0.15, 0.4, 1.0);
+    return faceCell(f * 0.95, bg * 0.85, id, uLE, uLM, uLX, uLY);
+  }
+  if (uWallPic == 2) {
+    float h = fract(q.x * 0.55 - uBeat * 0.125 + 0.08 * sin(q.y * 3.0 + uTime));
+    return (0.5 + 0.5 * cos(6.2832 * (h + vec3(0.0, 0.33, 0.67)))) * (0.75 + 0.25 * uKick);
+  }
+  if (uWallPic == 3) return texture2D(uWallTex, q).rgb;
+  return texture2D(uWallTex, p / max(asp, 1.0) * 1.1 + 0.5).rgb;
+}
 void main() {
-  vec2 uv = vUv;
+  vec2 uv = vUv, c0 = uv - 0.5;
+  // degauss: for a second after a tube powers on, the picture wobbles and its colours swirl
+  float dg = uCrt * exp(-uPower * 3.2) * step(uPower, 1.6) * (1.0 - 0.6 * uCalm);
+  uv += dg * 0.012 * vec2(sin(uv.y * 21.0 + uPower * 50.0), sin(uv.x * 15.0 + uPower * 37.0));
   if (uTear > 0.01) { float row = floor(uv.y * 36.0), ft = floor(uTime * 24.0); uv.x += (sh(vec2(row, ft)) - 0.5) * uTear * 0.3 * step(0.55, sh(vec2(row + 3.0, ft))); }
   float mask = 1.0;
   if (uCrt > 0.5) {
     vec2 c = uv - 0.5; uv = 0.5 + c * (1.0 + 0.1 * dot(c, c));                      // barrel
-    vec2 e = smoothstep(0.0, 0.012, uv) * smoothstep(0.0, 0.012, 1.0 - uv); mask = e.x * e.y;
+    vec2 e = smoothstep(0.0, 0.014, uv) * smoothstep(0.0, 0.014, 1.0 - uv); mask = e.x * e.y;
   }
   // power on / channel change: the picture collapses to a line, then opens up
   float sw = clamp(uSwitch * 7.0, 0.0, 1.0), squash = mix(0.004, 1.0, smoothstep(0.0, 1.0, sw));
   vec2 su = vec2(0.5 + (uv.x - 0.5) / mix(0.3, 1.0, smoothstep(0.0, 0.6, sw)), 0.5 + (uv.y - 0.5) / squash);
-  vec3 col = (su.y < 0.0 || su.y > 1.0 || su.x < 0.0 || su.x > 1.0 || uMode == 0) ? vec3(0.0) : content(su);
-  col += vec3(1.0) * (1.0 - sw) * smoothstep(0.02, 0.0, abs(uv.y - 0.5) * squash * 0.0 + abs(uv.y - 0.5) - squash * 0.5) * 2.0;
+  bool inside = !(su.y < 0.0 || su.y > 1.0 || su.x < 0.0 || su.x > 1.0 || uMode == 0);
+  vec3 col = inside ? content(su) : vec3(0.0);
+  if (inside && (uMode == 4 || uMode == 8)) col += tex(su, 3.5) * 0.14;           // light spreading in the glass
+  if (uWall > 0.001) col = mix(col, wallPic((gl_FragCoord.xy - uVP.xy) / uVP.zw), uWall);
+  col += vec3(1.0) * (1.0 - sw) * smoothstep(0.02, 0.0, abs(uv.y - 0.5) - squash * 0.5) * 2.0;
   if (uInvert > 0.5) col = vec3(1.0) - col;
+  float a = uv.x * 7.0 - uv.y * 5.0 + uPower * 9.0;
+  col *= 1.0 + dg * 0.9 * vec3(sin(a), sin(a + 2.1), sin(a + 4.2));
+  col *= uExposure * uBright;
+  col = col * (1.0 + 0.8 * uFlash) + vec3(0.12) * uFlash * uExposure;               // a flash: the picture burns brighter
+  vec3 glass;
   if (uCrt > 0.5) {
-    float lines = 240.0, fw = fwidth(uv.y * lines);                                  // scanlines, faded out before they alias
-    col *= 1.0 - 0.18 * (0.5 - 0.5 * cos(uv.y * lines * 6.2832)) * (1.0 - smoothstep(0.25, 0.6, fw));
-    col *= 1.0 - 0.35 * dot(uv - 0.5, uv - 0.5) * 2.5;
+    // aperture grille and scanlines, each faded out before it gets finer than a pixel (no moire, no crawl)
+    float tri = uv.x * 200.0 * uAspect, mk = 1.0 - smoothstep(0.22, 0.45, fwidth(tri));
+    float ph = fract(tri) * 6.2832; vec3 grille = 1.0 + 0.85 * cos(ph - vec3(0.0, 2.094, 4.189));
+    col *= mix(vec3(1.0), grille, mk * 0.55);
+    float ln = uv.y * 240.0, sk = 1.0 - smoothstep(0.22, 0.45, fwidth(ln)), lum = dot(col, vec3(0.3, 0.6, 0.1));
+    float s = 0.5 + 0.5 * cos(ln * 6.2832); col *= mix(1.0, mix(0.35, 0.75, clamp(lum * 1.5, 0.0, 1.0)) + 0.6 * s, sk * 0.8);   // bright lines bloom fatter
+    float r2 = dot(c0, c0);
+    col *= (1.0 - 1.1 * r2 * r2 * 4.0 - 0.3 * r2) * vec3(1.0 + 0.06 * c0.x, 1.0, 1.0 - 0.06 * c0.x);   // dimmer, slightly off-colour corners
+    float sheen = smoothstep(0.42, 0.0, length(c0 * vec2(1.0, 1.3) - vec2(-0.2, 0.24)));
+    glass = vec3(0.011, 0.013, 0.012) + vec3(0.028, 0.03, 0.034) * sheen;          // the grey of a dark tube, a soft reflection
+  } else {
+    // LCD: the pixel grid up close, a cool backlight that never quite goes black, off-axis the picture greys out
+    vec2 px = uv * vec2(300.0 * uAspect, 300.0), gk = 1.0 - smoothstep(vec2(0.22), vec2(0.45), fwidth(px)), gp = abs(fract(px) - 0.5);
+    col *= 1.0 - 0.45 * max(smoothstep(0.38, 0.5, gp.x) * gk.x, smoothstep(0.38, 0.5, gp.y) * gk.y);
+    float ndv = abs(dot(normalize(vN), normalize(-vV))), k = smoothstep(0.15, 0.85, ndv);
+    col = mix(col * 0.55 + vec3(0.02, 0.024, 0.035) * uExposure, col * vec3(0.94, 0.98, 1.05), k);
+    col *= 0.93 + 0.07 * smoothstep(0.5, 0.3, abs(c0.y));
+    glass = vec3(0.012, 0.014, 0.02) * (0.5 + 0.5 * uExposure);
   }
-  col = col * (1.0 + 1.2 * uFlash) + vec3(0.25) * uFlash;           // a flash: the picture burns brighter
-  vec3 glass = vec3(0.012, 0.013, 0.015);
-  gl_FragColor = vec4(glass + col * uBright * mask, 1.0);
+  // highlights roll off instead of clipping, so a white plate stays a plate and a colour stays that colour
+  float m = max(col.r, max(col.g, col.b)), K = 0.6 * uExposure, top = 1.15 * uExposure;
+  if (m > K) col *= (K + (top - K) * (1.0 - exp(-(m - K) / (top - K)))) / m;
+  gl_FragColor = vec4(glass + max(col, 0.0) * mask, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
-const VERT = `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const VERT = `varying vec2 vUv; varying vec3 vN, vV;
+void main() { vUv = uv; vN = normalMatrix * normal; vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = mv.xyz; gl_Position = projectionMatrix * mv; }`;
 
 export class Screens {
   constructor() {
-    this.list = [];
+    this.list = []; this.frame = 0; this.reduce = false;
     this.audio = new THREE.DataTexture(new Uint8Array(512 * 4 * 4), 512, 4, THREE.RGBAFormat); this.audio.magFilter = this.audio.minFilter = THREE.LinearFilter;
-    // one small canvas texture per tile, so a frame only uploads the tiles that are on a screen
+    // one small canvas texture per 2D tile, so a frame only uploads the tiles that changed and are on a screen
     this.tiles = Array.from({ length: COLS * ROWS }, (_, i) => {
       const c = document.createElement('canvas'); c.width = i === TILE.IPOD ? 320 : TW; c.height = i === TILE.IPOD ? 480 : TH;   // the iPod is native 320 x 480
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.anisotropy = 8;
       return { c, x: c.getContext('2d'), t };
     });
     this.x = this.tiles[0].x;
-    this.shared = { uAudio: { value: this.audio }, uTime: { value: 0 }, uBeat: { value: 0 }, uKick: { value: 0 }, uMid: { value: 0 }, uLevel: { value: 0 }, uScene: { value: 0 } };
+    this.viz = new Viz();
+    this.shared = { uAudio: { value: this.audio }, uTime: { value: 0 }, uBeat: { value: 0 }, uKick: { value: 0 }, uMid: { value: 0 }, uLevel: { value: 0 }, uScene: { value: 0 },
+      uExposure: { value: 0.85 }, uCalm: { value: 0 }, uWall: { value: 0 }, uWallPic: { value: 0 }, uWallTex: { value: null }, uVP: { value: new THREE.Vector4(0, 0, 1600, 900) } };
+    this.wall = { pic: WALL.FACE, amount: 0, blink: 0 }; this.moment = null;
+    const wc = document.createElement('canvas'); wc.width = 1024; wc.height = 512;
+    this.wordTex = { c: wc, x: wc.getContext('2d'), t: new THREE.CanvasTexture(wc), sig: null }; this.wordTex.t.colorSpace = THREE.SRGBColorSpace;
     this.painter = new Painter(null);
     this.used = new Set();
+    this._vp = new THREE.Vector4();
+    // the :3 face as a character (viz/face.js): the lead on the frankencomputer left of the deck, the chorus on the other
+    // screens showing a face, each with its own temperament; perform() hands the lead the song's story every frame
+    this.lead = new Face(); this.chorus = new Map(); this.voice = null;
+    this.perf = { songT: null, playing: false, alive: 0, bar: 0, sky: 0, pop: 0, lens: new THREE.Vector3(0, 3, 3), record: new THREE.Vector3() };
+    Object.assign(this.shared, { uLE: { value: this.lead.E }, uLM: { value: this.lead.M }, uLX: { value: this.lead.X }, uLY: { value: this.lead.Y } });
   }
+  // the conductor, every frame: where the song is and what the room is doing (song time, playing, alive, bar, sky, pop,
+  // and the lens and the record as world positions, so the faces can look at them)
+  perform(o) {
+    const P = this.perf, popped = o.pop > 0.9 && P.pop < 0.85;
+    Object.assign(P, o); this.lead.follow(o.songT, o);
+    if (popped && ['curious', 'shy', 'waking', 'sleepy', 'wanting', 'declare'].includes(this.lead.name)) this.lead.react('flash');   // a big flash: it flinches, then looks at the lens
+  }
+  get exposure() { return this.shared.uExposure.value; }
+  set exposure(v) { this.shared.uExposure.value = v; }
+  // a one-off wall moment: fades in over `fade` s, holds, fades out by `secs`
+  wallFor(pic, secs, fade = 0.3) { this.moment = { pic, t: 0, secs, fade }; }
   make(desc, seed) {
-    const u = { ...this.shared, uAtlas: { value: this.tiles[0].t }, uTile: { value: new THREE.Vector4(0, 0, 1, 1) }, uMode: { value: MODE.FACE }, uFlash: { value: 0 }, uSeed: { value: seed }, uAspect: { value: desc.w / desc.h },
-      uTear: { value: 0 }, uSwitch: { value: 1 }, uCrt: { value: desc.crt ? 1 : 0 }, uBright: { value: 1.2 }, uInvert: { value: 0 }, uBlink: { value: 0 }, uHue: { value: seed % 2 } };
+    const u = { ...this.shared, uFE: { value: new THREE.Vector4(0, 0, 1, 0) }, uFM: { value: new THREE.Vector4(0, 0, 0.9, 0) }, uFX: { value: new THREE.Vector4() }, uFY: { value: new THREE.Vector4() }, uAtlas: { value: this.tiles[0].t }, uTile: { value: new THREE.Vector4(0, 0, 1, 1) }, uMode: { value: MODE.FACE }, uFlash: { value: 0 }, uSeed: { value: seed }, uAspect: { value: desc.w / desc.h },
+      uTear: { value: 0 }, uSwitch: { value: 1 }, uPower: { value: 10 }, uCrt: { value: desc.crt ? 1 : 0 }, uBright: { value: 1 }, uInvert: { value: 0 }, uBlink: { value: 0 }, uHue: { value: seed % 2 } };
+    if (desc.fixed !== undefined) u.uWall = { value: 0 };                  // the iPod and the deck's display keep their own picture
     const m = new THREE.ShaderMaterial({ uniforms: u, vertexShader: VERT, fragmentShader: FRAG, extensions: { derivatives: true }, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 });
     desc.mesh.material = m;
-    const s = { ...desc, u, mode: MODE.FACE, tile: -1, t: 10, seed, flash: 0 };
+    const s = { ...desc, u, mode: MODE.FACE, tile: -1, t: 10, power: 10, seed, flash: 0, seen: -9 };
+    // drawn this frame (it passed the camera's culling): note it, run the visualisers once, and tell the wall where the frame is
+    desc.mesh.onBeforeRender = (r) => { s.seen = this.frame; this.viz.render(r); r.getCurrentViewport(this._vp); this.shared.uVP.value.copy(this._vp); };
     this.list.push(s);
     return s;
   }
   set(s, mode, tile = -1) {
+    if (s.mode === MODE.OFF && mode !== MODE.OFF) s.power = 0;            // a tube coming on degausses
+    if (mode === MODE.BARS) tile = TILE.ANALYZER;                        // the bars are the LED analyser now
     s.mode = mode; s.tile = tile; s.t = 0;
-    s.u.uMode.value = mode;
-    if (tile >= 0) { s.u.uAtlas.value = this.tiles[tile].t; s.u.uTile.value.set(0, 0, 1, 1); }
+    const gpu = tile >= 0 && GPU[tile];
+    s.u.uMode.value = gpu ? 8 : mode === MODE.BARS ? 8 : mode;
+    if (gpu) { s.u.uAtlas.value = this.viz.tex(gpu); s.u.uTile.value.set(0, 0, 1, 1); }
+    else if (tile >= 0) { s.u.uAtlas.value = this.tiles[tile].t; s.u.uTile.value.set(0, 0, 1, 1); }
     if (tile >= 0 && s.band) { const v = s.u.uTile.value; v.y = 1 - s.band; v.w = s.band; }   // only the top strip of the tile
   }
   // what a screen gives off, for the lights (rough average colour of each kind of content)
   glow(s) {
-    const t = s.mode === MODE.TILE ? s.tile : -1;
-    const c = s.mode === MODE.OFF ? [0, 0, 0] : s.mode === MODE.FACE ? (this.shared.uScene.value > 0.5 ? [0.25, 0.4, 1] : [0.45, 0.47, 0.5]) : s.mode === MODE.BARS ? [0.3, 0.9, 0.35]
+    const t = s.mode === MODE.TILE || s.mode === MODE.BARS ? s.tile : -1;
+    const c = s.mode === MODE.OFF ? [0, 0, 0] : s.mode === MODE.FACE ? (this.shared.uScene.value > 0.5 ? [0.25, 0.4, 1] : [0.45, 0.47, 0.5])
       : s.mode === MODE.BLISS ? [0.45, 0.7, 1] : s.mode === MODE.TUNNEL ? [0.8, 0.4, 0.9] : s.mode === MODE.SNOW ? [0.5, 0.5, 0.5] : s.mode === MODE.FACES ? [0.7, 0.45, 0.9]
       : t === TILE.BSOD || t === TILE.UEFI ? [0.1, 0.2, 1] : t === TILE.BIOS ? [0.15, 0.15, 0.15] : t === TILE.SYSMSG || t === TILE.DESKTOP ? [0.4, 0.6, 1] : t === TILE.COVER || t === TILE.TRIPLE ? [0.6, 0.55, 0.6]
-      : t === TILE.AMP || t === TILE.SCOPE ? [0.2, 0.9, 0.3] : t === TILE.WORD ? [0.8, 0.8, 0.8] : t === TILE.HEART ? [1, 0.3, 0.6] : [0.5, 0.5, 0.55];
+      : t === TILE.ANALYZER ? [0.3, 0.7, 0.2] : t === TILE.SCOPE ? [0.15, 0.5, 0.3] : t === TILE.VECTOR ? [0.5, 0.32, 0.12] : t === TILE.WATERFALL ? [0.4, 0.15, 0.45] : t === TILE.MILK ? [0.6, 0.4, 0.9]
+      : t === TILE.METERS ? [0.8, 0.62, 0.3] : t === TILE.AMP ? [0.25, 0.25, 0.32] : t === TILE.DAW ? [0.35, 0.38, 0.4]
+      : t === TILE.WORD ? [0.8, 0.8, 0.8] : t === TILE.HEART ? [1, 0.3, 0.6] : GLOW[t] || (t >= TILE.DEFRAG ? [0.25, 0.45, 0.45] : [0.5, 0.5, 0.55]);
     const on = Math.min(1, s.t * 5), b = s.u.uBright.value * on;
-    return c.map((v) => (v * (1 - s.flash) + s.flash) * b);
+    const w = s.u.uWall.value, wc = w > 0 ? [[0.3, 0.7, 0.2], [0.6, 0.45, 0.8], [0.8, 0.6, 0.7], [0.15, 0.6, 0.12], [0.6, 0.4, 0.9]][this.shared.uWallPic.value] : c;
+    return c.map((v, i) => ((v * (1 - w) + wc[i] * w) * (1 - s.flash) + s.flash) * b);
   }
-  update(dt, fx, gl) {
-    const a = this.audio.image.data;
+  update(dt, fx) {
+    this.frame++;
+    const calm = this.reduce, a = this.audio.image.data;
     for (let i = 0; i < 512; i++) {
       const sp = fx.spec ? fx.spec[Math.floor(i / 4)] : 0;
       a[i * 4] = sp * 255 * fx.alive;
@@ -236,27 +319,82 @@ export class Screens {
     }
     this.audio.needsUpdate = true;
     fx.word = this.word;
-    const sh = this.shared; sh.uTime.value = fx.time; sh.uBeat.value = fx.beat; sh.uKick.value = fx.kick * fx.alive; sh.uMid.value = fx.mid * fx.alive; sh.uLevel.value = fx.level;
+    const sh = this.shared; sh.uTime.value = fx.time; sh.uBeat.value = fx.beat; sh.uKick.value = fx.kick * fx.alive * (calm ? 0.3 : 1); sh.uMid.value = fx.mid * fx.alive; sh.uLevel.value = fx.level; sh.uCalm.value = calm ? 1 : 0;
+    // the wall: the choreography's amount, or a moment's
+    let wall = this.wall.amount, pic = this.wall.pic;
+    const mo = this.moment;
+    if (mo) { mo.t += dt; const k = Math.min(1, mo.t / mo.fade, (mo.secs - mo.t) / mo.fade); if (mo.t >= mo.secs) this.moment = null; else if (k > wall) { wall = Math.max(0, k); pic = mo.pic; } }
+    sh.uWall.value = wall; sh.uWallPic.value = pic;
+    this.wall.blink = Math.max(0, this.wall.blink - dt * 6);
+    if (wall > 0.001 && pic === WALL.MILK) { this.viz.need('milk'); sh.uWallTex.value = this.viz.tex('milk'); }
+    if (wall > 0.001 && pic === WALL.WORD) { this.wordPlate(this.word); sh.uWallTex.value = this.wordTex.t; }
     this.used.clear();
+    const recent = this.frame - 3;
     for (const s of this.list) {
-      s.t += dt; s.flash *= Math.exp(-dt * 10);
-      s.tear = Math.max(0, (s.tear || 0) - dt * 4); s.u.uTear.value = s.tear;
-      s.u.uSwitch.value = s.t; s.u.uFlash.value = s.flash; s.u.uBright.value = 1.05 + 0.45 * fx.kick * fx.alive;
-      s.blink = Math.max(0, (s.blink || 0) - dt * 6); s.u.uBlink.value = Math.min(1, s.blink);
-      if (s.mode === MODE.TILE) this.used.add(s.tile);
+      s.t += dt; s.power += dt; s.flash *= Math.exp(-dt * 10);
+      s.tear = calm ? 0 : Math.max(0, (s.tear || 0) - dt * 4); s.u.uTear.value = s.tear;
+      s.u.uSwitch.value = s.t; s.u.uPower.value = s.power; s.u.uFlash.value = s.flash * (calm ? 0.3 : 1);
+      s.u.uBright.value = 0.94 + (calm ? 0.04 : 0.2) * fx.kick * fx.alive;
+      s.blink = Math.max(0, (s.blink || 0) - dt * 6); s.u.uBlink.value = Math.min(1, wall > 0.5 && pic === WALL.FACE && s.u.uWall === sh.uWall ? this.wall.blink : s.blink);
+      const on = s.seen >= recent || s.t < 0.25;
+      const gpu = (s.mode === MODE.TILE || s.mode === MODE.BARS) && GPU[s.tile];
+      if (gpu) { s.u.uAtlas.value = this.viz.tex(gpu); if (on) this.viz.need(gpu); }
+      else if (s.mode === MODE.TILE && on) this.used.add(s.tile);
     }
-    // repaint at most three tiles a frame, in turn (each upload costs the GPU about a millisecond); a tile that has
-    // never been painted, or whose word just changed, jumps the queue
-    const used = [...this.used], fresh = used.filter((t) => !this.tiles[t].sig || (t === TILE.WORD && this.tiles[t].sig !== `${fx.word}`));
-    this.rr = (this.rr || 0);
-    const pick = [...fresh];
-    for (let k = 0; k < used.length && pick.length < 3; k++) { const t = used[(this.rr + k) % used.length]; if (!pick.includes(t)) pick.push(t); }
-    this.rr += 3;
-    for (const t of pick.slice(0, Math.max(3, fresh.length))) {
-      const T = this.tiles[t], sig = t === TILE.BSOD || t === TILE.NAME ? 'once' : t === TILE.WORD ? `${fx.word}` : 'live';
-      if (sig !== 'live' && T.sig === sig) continue;
-      T.sig = sig; this.painter.x = T.x; T.x.save(); this.painter.tile(t, fx); T.x.restore(); T.t.needsUpdate = true;
+    this.performFaces(dt, fx, recent);
+    this.viz.feed(dt, fx, calm, trk);
+    // repaint the 2D tiles that are on a screen in view and whose picture changed (each upload costs the GPU); a
+    // tile that has never been painted, or whose word just changed, goes first; at most four a frame
+    const P = this.painter, todo = [];
+    for (const t of this.used) { const T = this.tiles[t], sig = P.sig(t, fx); if (sig !== T.sig) todo.push([t, sig, !T.sig || t === TILE.WORD]); }
+    todo.sort((x, y) => y[2] - x[2]);
+    this.rr = (this.rr || 0) + 1;
+    const fresh = todo.filter((d) => d[2]), rest = todo.filter((d) => !d[2]);
+    const pick = [...fresh, ...rest.map((_, i) => rest[(i + this.rr) % rest.length])].slice(0, Math.max(4, fresh.length));
+    for (const [t, sig] of pick) { const T = this.tiles[t]; T.sig = sig; P.x = T.x; T.x.save(); P.tile(t, fx); T.x.restore(); T.t.needsUpdate = true; }
+    this.repainted = pick.length;
+  }
+  // the faces: the lead always (it is also the face in the sky and on the wall), the chorus where one is in view
+  performFaces(dt, fx, recent) {
+    // this frame's song time (perform() hands over the story after the screens have drawn, which would sing a frame late)
+    const P = this.perf, st = P.songT != null && fx.songT != null ? fx.songT : P.songT, V = this.voice = fx.song ? (this.voice?.song === fx.song ? this.voice : new Voice(fx.song)) : null, L = this.lead;
+    const live = P.playing && st != null;
+    if (V && live && this.lastSongT != null && st > this.lastSongT && st - this.lastSongT < 0.5) {
+      for (const s of V.snaps) if (s > this.lastSongT && s <= st) L.react('snap');                        // a cut-off "f-": the mouth snaps shut
+      for (const c of fx.song.m.cues || []) if (c.t1 > this.lastSongT && c.t1 <= st && c.k > 0.5) L.react('gasp');   // the drop lands
     }
+    this.lastSongT = live ? st : null;
+    const mouth = V && live ? V.at(st) : { open: P.playing ? Math.max(0, fx.mid * fx.alive - 0.35) * 1.4 : 0, wide: 0.3 };   // a record with no map: the mids
+    const hero = this.hero ||= this.list.find((s) => s.role === 'hero');
+    const ctx = { mesh: hero?.mesh, lens: P.lens, record: P.record, beat: fx.beat, alive: fx.alive };
+    if (hero && P.scene) {             // the lead's webcam (viz/era.js): sat on top of its monitor, looking past the deck into the room
+      const R = this.viz.room ||= { scene: null, from: new THREE.Vector3(), at: new THREE.Vector3() }; R.scene = P.scene; R.lite = P.quality != null && P.quality < 2;
+      hero.mesh.updateWorldMatrix(true, false); R.from.set(0, hero.h * 0.75, 0.06).applyMatrix4(hero.mesh.matrixWorld); R.at.copy(P.record).lerp(P.lens, 0.12);
+    }
+    ctx.mouth = mouth; L.update(dt, ctx);
+    const lag = fx.song ? fx.song.m.beatLen : 0.44;
+    for (const s of this.list) {
+      if (s.mode !== MODE.FACE && s.mode !== MODE.FACES) continue;
+      let A = L;
+      if (s !== hero) {
+        if (s.seen < recent && s.t > 0.25) continue;
+        A = this.chorus.get(s);
+        if (!A) { const k = this.chorus.size % 4; A = new Face({ seed: this.chorus.size + 1, ...TEMPER[k] }); A.kind = k; this.chorus.set(s, A); }
+        // the chorus feels what the lead feels, each a little late and in its own way, and sings the hook a beat behind her
+        const n = L.t - L.since > A.temper.lag ? L.name : L.prev || L.name; A.storyName = TEMPER[A.kind].map[n] || n;
+        ctx.mesh = s.mesh; ctx.mouth = V && live ? V.at(st - lag - A.temper.lag * 0.2, true) : { open: mouth.open * 0.7, wide: mouth.wide }; A.update(dt, ctx);
+      } else s.u.uBright.value *= L.dim;
+      s.u.uFE.value.copy(A.E); s.u.uFM.value.copy(A.M); s.u.uFX.value.copy(A.X); s.u.uFY.value.copy(A.Y);
+    }
+  }
+  // the wall's word, the whole frame wide: her neon-green condensed type on black (a white plate across every screen
+  // only floods the room with white)
+  wordPlate(word) {
+    const w = (word || 'MY COMPUTER').replace(/[^A-Z0-9—' ]/gi, '').toUpperCase(), W = this.wordTex;
+    const sig = `${w}|${document.fonts?.status}`; if (W.sig === sig) return; W.sig = sig;
+    const x = W.x; x.fillStyle = '#050505'; x.fillRect(0, 0, 1024, 512); x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.save(); x.translate(512, 270); x.font = '700 300px Oswald, Anton, sans-serif'; const mw = x.measureText(w).width; x.scale(Math.min(1, 940 / mw), 1.45); x.fillStyle = '#39ff2e'; x.fillText(w, 0, 0); x.restore();
+    W.t.needsUpdate = true;
   }
 }
 
@@ -266,7 +404,6 @@ const XP_BLUE = '#0a54e3', TAHOMA = 'Tahoma, Verdana, Segoe UI, sans-serif', MON
 export class Painter {
   constructor(x) {
     this.x = x; this.cover = art.img;   // the visitor's own album art (art.js)
-    this.scope = document.createElement('canvas'); this.scope.width = W; this.scope.height = H; this.sx = this.scope.getContext('2d');
     this.lines = []; this.copyN = 0;
   }
   tile(t, fx) {
@@ -277,9 +414,6 @@ export class Painter {
       case TILE.BSOD: return this.bsod(x, fx);
       case TILE.SYSMSG: return this.sysmsg(x, fx);
       case TILE.COVER: return this.coverGlitch(x, fx);
-      case TILE.AMP: return this.amp(x, fx);
-      case TILE.SCOPE: return this.scopeTile(x, fx);
-      case TILE.DAW: return this.daw(x, fx);
       case TILE.WORD: return this.word(x, fx);
       case TILE.WAVE: return this.wave(x, fx);
       case TILE.DESKTOP: return this.desktop(x, fx);
@@ -292,6 +426,27 @@ export class Painter {
       case TILE.IPOD: return this.ipod(x, fx);
       case TILE.VFD: return this.vfd(x, fx);
     }
+  }
+  // what a tile's picture depends on right now: it is repainted only when this changes
+  sig(t, fx) {
+    const f = document.fonts?.status === 'loaded' ? 'f' : 'n', T = fx.time, k = fx.kick * fx.alive, art_ = art.has() ? 'a' : '-';
+    if ((t === TILE.COVER || t === TILE.TRIPLE) && !art.has()) t = TILE.NAME;
+    switch (t) {
+      case TILE.BIOS: return `${f}${Math.floor((T * 4) % 18)}|${Math.floor(T * 3) % 2}`;
+      case TILE.BSOD: case TILE.NAME: return f;
+      case TILE.SYSMSG: return `${f}${art_}${this.thumb ? Math.floor(T / 0.4) : 0}`;
+      case TILE.COVER: return `${art_}${Math.floor(T * (k > 0.05 ? 15 : 4))}`;
+      case TILE.WORD: return `${f}${fx.word}`;
+      case TILE.WAVE: return `${f}${art_}${fx.song ? Math.floor((fx.songT || 0) / fx.song.m.dur * 120) : -1}`;
+      case TILE.DESKTOP: case TILE.COPY: return `${f}${fx.hits % 6}|${Math.floor(T * 15)}`;
+      case TILE.UEFI: return `${f}${(fx.hits || 0) % 6}`;
+      case TILE.HEART: return `${f}${Math.round(k * 10)}`;
+      case TILE.TRIPLE: return `${art_}${Math.floor(T * 6) % 3}|${Math.round(k * 5)}`;
+      case TILE.CHAT: return `${f}${this.sung(fx)}|${Math.floor(T * 2) % 2}`;
+      case TILE.IPOD: return `${f}${art_}${Math.floor(Math.max(0, fx.songT || 0))}|${fx.alive > 0.3}`;
+      case TILE.VFD: { let b = ''; for (let i = 0; i < 12; i++) b += (fx.spec ? fx.spec[4 + i * 9] : 0) * fx.alive * 12 > i * 0.9 ? 1 : 0; return `${f}${Math.floor(T * 10)}|${b}`; }
+    }
+    return `${Math.floor(T * 15)}`;
   }
   bios(x, fx) {
     x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
@@ -338,51 +493,6 @@ export class Painter {
             x.drawImage(this.cover, 0, (y - oy) / s * this.cover.height, this.cover.width, h / s * this.cover.height, ox + dx, y, s, h);
     }
     if (amt > 0.6) { x.globalCompositeOperation = 'difference'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.globalCompositeOperation = 'source-over'; }
-  }
-  amp(x, fx) {
-    x.fillStyle = '#1a1b26'; x.fillRect(0, 0, W, H);
-    const g = x.createLinearGradient(0, 0, W, 0); g.addColorStop(0, '#3a3c55'); g.addColorStop(1, '#22233a'); x.fillStyle = g; x.fillRect(0, 0, W, 22);
-    x.fillStyle = '#d8d8f0'; x.font = `bold 12px ${TAHOMA}`; x.fillText('WINAMP', 8, 15);
-    x.fillStyle = '#000'; x.fillRect(10, 30, W - 20, 64);
-    x.fillStyle = '#00e676'; x.font = `34px ${MONO}`; const tt = Math.max(0, fx.songT || 0);
-    x.fillText(`${Math.floor(tt / 60)}:${String(Math.floor(tt % 60)).padStart(2, '0')}`, 18, 76);
-    const tick = `***  1. ${trk().artist} - ${trk().title}  ***  ${trk().album}  `, off = Math.floor(fx.time * 8) % tick.length;
-    x.font = `20px ${MONO}`; x.fillText((tick + tick).slice(off, off + 26), 110, 70);
-    const n = 40, bw = (W - 20) / n;
-    for (let i = 0; i < n; i++) {
-      const v = (fx.spec ? fx.spec[Math.floor(2 + i * 2.6)] : 0) * fx.alive, h = v * 150, pk = (fx.peak ? fx.peak[Math.floor(2 + i * 2.6)] : 0) * fx.alive * 150;
-      const gg = x.createLinearGradient(0, H - 20, 0, H - 170); gg.addColorStop(0, '#16c60c'); gg.addColorStop(0.6, '#f7e400'); gg.addColorStop(1, '#ff2a2a');
-      x.fillStyle = gg; x.fillRect(10 + i * bw, H - 20 - h, bw - 2, h); x.fillStyle = '#cfd8ff'; x.fillRect(10 + i * bw, H - 22 - pk, bw - 2, 2);
-    }
-  }
-  scopeTile(x, fx) {
-    const s = this.sx; s.fillStyle = 'rgba(0,8,2,.28)'; s.fillRect(0, 0, W, H);
-    if (fx.wavL) {
-      s.strokeStyle = 'rgba(80,255,140,.95)'; s.lineWidth = 2; s.shadowColor = '#4f8'; s.shadowBlur = 8; s.beginPath();
-      for (let i = 0; i < 512; i++) { const px = W / 2 + fx.wavL[i] * 230 * fx.alive, py = H / 2 - fx.wavR[i] * 230 * fx.alive; i ? s.lineTo(px, py) : s.moveTo(px, py); }
-      s.stroke(); s.shadowBlur = 0;
-    }
-    x.drawImage(this.scope, 0, 0);
-    x.strokeStyle = 'rgba(80,255,140,.15)'; x.lineWidth = 1; for (let i = 1; i < 8; i++) { x.beginPath(); x.moveTo(i * W / 8, 0); x.lineTo(i * W / 8, H); x.stroke(); }
-    for (let i = 1; i < 6; i++) { x.beginPath(); x.moveTo(0, i * H / 6); x.lineTo(W, i * H / 6); x.stroke(); }
-  }
-  daw(x, fx) {
-    x.fillStyle = '#3b444b'; x.fillRect(0, 0, W, H); x.fillStyle = '#2b3237'; x.fillRect(0, 0, W, 20);
-    x.fillStyle = '#c9d4dc'; x.font = `11px ${TAHOMA}`; x.fillText('Playlist - Arrangement › fuck my computer', 8, 14);
-    const song = fx.song, dur = song ? song.m.dur : 190, view = 48, t = Math.max(0, fx.songT || 0), t0 = Math.max(0, Math.min(dur - view, t - view * 0.35));
-    const tracks = ['kick', 'bass', 'vox', 'lead', 'fx', 'drums', 'chops', 'pad'], cols = ['#7fd35a', '#5aa6d3', '#d35aa0', '#d3b35a', '#9a7fd3', '#5ad3c4', '#d36a5a', '#a0d35a'];
-    tracks.forEach((n, i) => {
-      const y = 24 + i * 32; x.fillStyle = i % 2 ? '#353d43' : '#394248'; x.fillRect(0, y, W, 31); x.fillStyle = '#9fb0bc'; x.fillText(n, 6, y + 19);
-      if (!song) return;
-      for (const b of song.bars) {
-        const on = b.sec === 'drop' ? i !== 7 : b.sec === 'build' ? (i % 3 !== 0) : i === 7 || i === 2;
-        if (!on || b.t + 4 * song.m.beatLen < t0 || b.t > t0 + view) continue;
-        const X = 50 + (b.t - t0) / view * (W - 50), w = 4 * song.m.beatLen / view * (W - 50) - 1;
-        x.fillStyle = cols[i]; x.globalAlpha = 0.85; x.fillRect(X, y + 3, w, 25); x.globalAlpha = 1;
-        x.fillStyle = 'rgba(0,0,0,.25)'; for (let k = 0; k < 4; k++) x.fillRect(X + 2 + k * w / 4, y + 14 + ((k * 7 + i * 3) % 9) - 4, w / 6, 3);
-      }
-    });
-    const px = 50 + (t - t0) / view * (W - 50); x.fillStyle = '#7dff9b'; x.fillRect(px, 20, 2, H - 20);
   }
   word(x, fx) {                                         // her type plates: white, a tall serif, the word in blue, red script across
     const w = (fx.word || 'MY COMPUTER').replace(/[^A-Z0-9—' ]/gi, '');
@@ -455,14 +565,26 @@ export class Painter {
     }
     x.fillStyle = `rgba(150,60,255,${0.25 + 0.3 * fx.kick * fx.alive})`; x.fillRect(0, 0, W, H);
   }
+  // how many of her words have been sung by now
+  sung(fx) { const ws = fx.song?.m.lyrics?.words, t = fx.songT; if (!ws || t == null) return 0; let n = 0; for (const w of ws) if (w.t <= t) n++; return n; }
+  // an instant-message window that says only what is true: her lines, each word typed in as she sings it
   chat(x, fx) {
-    x.fillStyle = '#dfe9f5'; x.fillRect(0, 0, W, H); this.window(x, 0, 0, W, H, 'ninajirachi - Conversation');
-    const msgs = [['nina', 'did u back up the stems'], ['computer', ':3'], ['nina', 'i love you'], ['computer', 'i know'], ['nina', 'dont crash tonight'], ['computer', 'no promises']];
-    const n = 1 + Math.floor((fx.time * 0.7) % msgs.length);
-    msgs.slice(0, n).forEach(([who, m], i) => {
-      x.fillStyle = who === 'nina' ? '#c23' : '#227'; x.font = `bold 12px ${TAHOMA}`; x.fillText(who + ' says:', 12, 46 + i * 38);
-      x.fillStyle = '#111'; x.font = `13px ${TAHOMA}`; x.fillText(m, 22, 62 + i * 38);
+    const who = trk().artist, ws = fx.song?.m.lyrics?.words || [], n = this.sung(fx), lines = [];
+    for (const w of ws.slice(0, n)) { const l = lines[lines.length - 1]; if (l && l.line === w.line) l.words.push(w.w); else lines.push({ line: w.line, words: [w.w] }); }
+    x.fillStyle = '#008080'; x.fillRect(0, 0, W, H);
+    const a = win(x, 0, 0, W, H, `${who} - Instant Message`);
+    x.fillStyle = '#000'; x.font = `11px ${SANS}`; x.fillText('File   Edit   Insert   People', a.x + 4, a.y + 10);
+    sunken(x, a.x + 2, a.y + 16, a.w - 4, 158);
+    x.save(); x.beginPath(); x.rect(a.x + 4, a.y + 18, a.w - 8, 154); x.clip();
+    const show = lines.slice(-6), next = ws[n], typing = next && next.t - (fx.songT ?? 0) < 1.2 && show.length && next.line === show[show.length - 1].line;
+    show.forEach((l, i) => {
+      const y = a.y + 34 + i * 25; x.font = `bold 12px ${SANS}`; x.fillStyle = '#c00000'; const tag = `${who}: `; x.fillText(tag, a.x + 8, y);
+      x.font = `13px ${SANS}`; x.fillStyle = '#000'; x.fillText(l.words.join(' '), a.x + 8 + x.measureText(tag).width + 6, y, a.w - 30 - x.measureText(tag).width);
     });
+    x.restore();
+    x.font = `11px ${SANS}`; x.fillStyle = '#000'; if (typing) x.fillText(`${who} is typing a message.`, a.x + 4, a.y + 188);
+    sunken(x, a.x + 2, a.y + 194, a.w - 72, 56); if (Math.floor(fx.time * 2) % 2) { x.fillStyle = '#000'; x.fillRect(a.x + 8, a.y + 200, 1, 14); }
+    button(x, a.x + a.w - 64, a.y + 194, 62, 26, 'Send'); button(x, a.x + a.w - 64, a.y + 224, 62, 26, 'Talk');
   }
   // the iPod touch's Now Playing, as iPhone OS 3 drew it, at its own 320 x 480; with the small crack from the lyrics
   ipod(x, fx) {

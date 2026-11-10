@@ -6,6 +6,7 @@
 // a slab on a white card, the condensed sans on a black card, and a blackletter
 // her type, from the videos: Times stretched tall and thin (iPod Touch), spaced small caps, a royal-blue condensed
 // grotesk and red script (the Fuck My Computer plates), neon green and magenta condensed (IT SAYS MY NAME)
+import { Desk } from './desk.js';
 const SERIF = '"Times New Roman", Times, serif';
 const STYLES = [
   { font: `400 {s}px ${SERIF}`, fill: '#fff', sx: 0.6, sy: 1.75, soft: true },
@@ -23,6 +24,7 @@ export class Overlay {
   constructor(el) {
     this.c = el; this.x = el.getContext('2d');
     this.words = []; this.sub = ''; this.line = -1; this.n = 0; this.cycle = -1; this.group = -1;
+    this.desk = new Desk(); this.hole = null;
   }
   rnd() { return hash(this.n++ * 7919 + 13); }
   place(big) {
@@ -41,7 +43,7 @@ export class Overlay {
     if (live.length > (extra.cap || 10)) { const old = live[0]; old.gone = true; old.vy = -60; old.va = 5; }
   }
   // a sung word. cut words ("f-") come out big, as F—, tearing
-  lyric(word, line, power) {
+  lyric(word, line, power, subOnly = false) {
     const base = Math.min(this.c.width * 0.62, this.c.height);
     if (line !== this.line) {                                    // a new line: the old words drift off
       for (const o of this.words) if (!o.gone) { o.gone = true; o.va = 2.5; o.vy = -20 - 40 * this.rnd(); }
@@ -51,8 +53,7 @@ export class Overlay {
     const key = /computer|fuck|name|better|world/i.test(word);
     const st = cut ? BIG[0] : key ? STYLES[[2, 3, 4, 5][Math.floor(this.rnd() * 4)]] : STYLES[Math.floor(this.rnd() * 2)];
     const size = (cut ? 0.15 : key ? 0.08 + 0.04 * this.rnd() : 0.032 + 0.035 * this.rnd()) * base * (0.8 + 0.4 * power);
-    const [x, y] = this.place(cut || /computer/i.test(word));
-    this.add(show, st, size, x, y, { glitch: cut ? 1 : 0 });
+    if (!subOnly) { const [x, y] = this.place(cut || /computer/i.test(word)); this.add(show, st, size, x, y, { glitch: cut ? 1 : 0 }); }
     this.sub = (this.sub ? this.sub + ' ' : '') + (cut ? word.slice(0, -1).toUpperCase() + '—' : word.toUpperCase().replace(/[,.]$/, ''));
   }
   // between the vocals: the jig chops the song's words (4-5-6-2 per bar)
@@ -141,7 +142,8 @@ export class Overlay {
   }
   clear() { for (const o of this.words) { o.gone = true; o.va = 6; } this.sub = ''; this.line = -1; }
   setSub(s) { this.sub = s; }
-  draw(dt, alpha, sky = 0, shake = 0) {
+  // take: { kind, p } while the computer has the whole picture (desk.js); this.hole is then where the live clip shows through
+  draw(dt, alpha, sky = 0, shake = 0, take = null) {
     const light = sky > 0.9;                                // dark ink only when the bright sky is fully up
     const c = this.c, dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
@@ -151,6 +153,7 @@ export class Overlay {
       if (o.gone) o.a -= (o.va || 3) * dt;
     }
     this.words = this.words.filter((o) => o.a > 0.01 && o.x > -w && o.x < 2 * w && o.y > -h && o.y < 2 * h);
+    this.hole = take ? this.desk.draw(x, w, h, take.kind, take.p, dt) : null; if (!take && this.desk.n) this.desk.reset();
     if (alpha <= 0.01) return;
     x.textAlign = 'center'; x.textBaseline = 'middle';
     const fr = Math.floor(performance.now() / 33), sx = shake * (hash(fr) - 0.5) * w * 0.03, sy = shake * (hash(fr + 7) - 0.5) * h * 0.03;
@@ -175,6 +178,11 @@ export class Overlay {
       else if (st.stroke) { x.lineWidth = Math.max(2, o.size * 0.045); x.strokeStyle = ink; x.strokeText(o.w, 0, 0); }
       else { x.fillStyle = ink; x.fillText(o.w, 0, 0); }
       x.restore();
+    }
+    if (this.photo > 0.02) {                               // a cheap camera's date stamp, burnt into the corner of the photograph (the album's release day)
+      const s = Math.max(15, Math.min(w, h * 1.5) * 0.026);
+      x.globalAlpha = Math.min(1, this.photo * 1.6); x.font = `bold ${s}px "Courier New", Courier, monospace`; x.textAlign = 'right'; x.textBaseline = 'alphabetic';
+      x.shadowColor = 'rgba(255,120,0,.8)'; x.shadowBlur = s * 0.35; x.fillStyle = '#ffb347'; x.fillText("'25  8  8", w - s * 2.2, h - s * 2.4); x.shadowBlur = 0; x.textAlign = 'center'; x.textBaseline = 'middle';
     }
     if (this.sub) {                                       // the subtitle, DVD yellow with a black edge
       const s = Math.max(16, Math.min(w, h * 1.4) * 0.028);
