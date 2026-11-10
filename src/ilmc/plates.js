@@ -31,6 +31,7 @@ export class Plates {
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = -4; this.mesh.visible = false; scene.add(this.mesh);
     this.line = -1; this.n = 0; this.kind = null; this.a = 0;
   }
+  reset() { this.clear(); this.line = -1; this.kind = null; }
   clear() { this.x.clearRect(0, 0, this.c.width, this.c.height); this.tex.needsUpdate = true; this.n = 0; }
   // a sung word: `line` is its line's index in the lyrics, `text` the whole line (it decides the layout)
   word(w, line, text, idx) {

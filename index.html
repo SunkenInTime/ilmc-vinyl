@@ -316,7 +316,8 @@
     #teaser svg { width: 26px; height: 26px; }
     #teaser .sub, #teaser b { display: none; }      /* the face and About: the toggles need the rest of the row */
     #teaser .line { margin: 0; font-size: 13px; }
-    #toggles button { padding: 9px 9px; }
+    #toggles button { padding: 9px 7px; }
+    #toggles .wide { display: none; }               /* "Reset", not "Reset view": the row has to clear the About plate */
     .side { left: calc(var(--gut) + var(--sl)); right: calc(var(--gut) + var(--sr)); width: auto !important; top: calc(var(--gut) + var(--st) + 50px); max-height: calc(100% - var(--st) - var(--sb) - 150px); }
     #hud { width: min(250px, calc(100vw - 2 * var(--gut))); }
     #hud #stats { font-size: 10px; gap: 0 8px; }
@@ -369,7 +370,7 @@
 </header>
 
 <nav id="toggles" class="chrome plate" aria-label="Settings">
-  <button id="t-reset" hidden>Reset view</button>
+  <button id="t-reset" hidden title="Reset view">Reset<span class="wide"> view</span></button>
   <button id="t-records" aria-pressed="false" aria-controls="shelf">Records</button>
   <button id="t-flash" aria-pressed="true" title="Flashing lights (L)">Flashing on</button>
   <button id="t-ctl" aria-pressed="false" aria-controls="ctl">Controls</button>

@@ -327,6 +327,7 @@ async function cutFiles(files) {
   if (!tracks.length) {
     sfx.error(); const msg = `This browser can't read ${list[0].name}. Try an MP3, FLAC, WAV or M4A.`;
     insertState('error', { err: msg });
+    return;                                     // nothing to cut: the window says why, and what is on the platter stays
   }
   // is it the song?
   cutStage('match');

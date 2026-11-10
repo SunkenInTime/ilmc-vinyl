@@ -474,7 +474,7 @@ export class ILMC {
       lights: this.deckLights, bare: true,
       cam: this.camOut(alive, fl),
       flash: this.flashOut, noFloor: true,
-      post: { act: this.env, day: this.day, pop: this.reduce ? 0 : Math.min(1, this.pop), uTile: this.tiles, uCrt: this.crt, win: this.winRect(), uFlash: this.flash * fl * 0.85, uSplit: this.split * fl, uZoom: this.zoomBlur * fl, uTri: this.tri > 0 && !this.reduce ? 1 : 0, uInv: this.inv > 0 && !this.reduce ? 1 : 0,
+      post: { act: this.env, day: this.day, pop: this.reduce ? 0 : Math.min(1, this.pop), uTile: this.tiles, uCrt: this.crt, win: this.winRect(), uFlash: this.flash * (this.reduce ? 0.06 : 0.85), uSplit: this.split * fl, uZoom: this.zoomBlur * fl, uTri: this.tri > 0 && !this.reduce ? 1 : 0, uInv: this.inv > 0 && !this.reduce ? 1 : 0,
         uBloom: (0.11 + 0.05 * L.kick * alive) * (1 - 0.45 * this.sky) * (1 - this.env.void), uThresh: 1.3 + 0.5 * this.sky, uHal: 0.05 * (1 - this.sky), uAO: 0.95 - 0.5 * this.sky + 0.35 * this.env.void,
         uFocus: this.focus || 3, uAperture: 0.014 * (1 - 0.6 * this.sky) * (1 - 0.5 * (this.spamS || 0)) * (1 - this.env.void) * (this.shot ? Math.min(1, Math.pow(32 / this.shot.wide, 1.6)) : 1),   // a wide lens holds more in focus
         uGrain: 0.03 + 0.02 * this.sky + 0.08 * (this.spamS || 0), uVig: (0.85 - 0.4 * this.sky) * (1 - this.env.void),
@@ -488,7 +488,10 @@ export class ILMC {
   words(dt, t, playing) {
     const ly = this.song.m.lyrics, cues = this.song.m.cues || [], prev = this.lastT;
     // the needle's time wobbles back a few ms between telemetry packets; only ever fire past the furthest point reached
-    if (this.doneT == null || t < this.doneT - 0.5 || t > this.doneT + 0.5) this.doneT = t;
+    if (this.doneT == null || t < this.doneT - 0.5 || t > this.doneT + 0.5) {
+      this.doneT = t;
+      if (ly) { this.plates.reset(); const n = {}; for (const w of ly.words) { if (w.t > t) break; n[w.line] = (n[w.line] || 0) + 1; this.plates.word(w.w, w.line, ly.lines[w.line]?.text || '', n[w.line] - 1); } }   // a seek: the type plates are printed again from what has been sung by now
+    }
     const from = Math.max(prev ?? t, this.doneT), fwd = playing && prev != null && t > from && t - from < 0.5;
     if (fwd && ly && this.overlay) for (const w of ly.words) if (w.t > from && w.t <= t) this.sung(w);
     this.inLine = !!(ly && ly.words.some((w) => w.t <= t && w.t > t - 1.6));   // she is singing (or just was)
@@ -806,12 +809,13 @@ export class ILMC {
       const pl = this.points[i]; if (pl) { pl.position.copy(v); pl.color.setRGB(g[0], g[1], g[2]); pl.intensity = k * half * half * 60 * 1.6; }
     });
     // the place: a dark room with a coloured wash on the beat, a wallpaper sky, the hill under its sun, or the white
+    const calm = this.reduce ? 0.08 : 1;                             // "Flashing off": a white-out is a gentle lift, never a flash
     const sky = this.sky, E = this.env, set = smooth(clamp01((this.day - 0.35) / 0.65)), night = smooth(clamp01((this.day - 1) / 0.6)), dayK = E.bliss * (1 - night);
     const wash = new THREE.Color().setHSL(fx.palette % 2 ? 0.9 : 0.6, 0.9, 0.5).multiplyScalar(0.05 * fx.alive * (1 + 2 * this.strobe) * (1 - E.bliss - E.void));
     const A = this.deckLights.amb, amb = new THREE.Color(0.25, 0.35, 0.55).multiplyScalar(E.y2k * 0.9 + dayK * (0.8 - 0.5 * set)).add(new THREE.Color(1.5, 1.5, 1.5).multiplyScalar(E.void))
-      .add(new THREE.Color(0.05, 0.08, 0.17).multiplyScalar(E.bliss * night)).add(wash).addScalar(this.flash * 0.6 + this.strobe * 0.12 * fx.alive * (this.reduce ? 0.2 : 1));
+      .add(new THREE.Color(0.05, 0.08, 0.17).multiplyScalar(E.bliss * night)).add(wash).addScalar(this.flash * 0.6 * calm + this.strobe * 0.12 * fx.alive * (this.reduce ? 0.2 : 1));
     A[0] = amb.r; A[1] = amb.g; A[2] = amb.b;
-    this.hemi.intensity = 0.06 + E.y2k * 2.2 + dayK * (0.95 - 0.6 * set) + E.bliss * night * 0.42 + E.void * 2.6 + this.flash * 2;
+    this.hemi.intensity = 0.06 + E.y2k * 2.2 + dayK * (0.95 - 0.6 * set) + E.bliss * night * 0.42 + E.void * 2.6 + this.flash * 2 * calm;
     this.hemi.color.setRGB(0.55 + 0.45 * (1 - sky) + 0.5 * E.void + 0.35 * E.bliss * set - 0.6 * E.bliss * night, 0.7 + 0.3 * E.void, 1.0);
     this.hemi.groundColor.setRGB(0.2 + 0.2 * sky + 0.6 * E.void - 0.1 * E.bliss, 0.35 * sky + 0.1 + 0.5 * E.void, 0.1 + 0.9 * E.void);
     // the sun: a plain one in the wallpaper skies; on the hill it is the one in the sky, casting the only shadows, and it sets
@@ -838,7 +842,7 @@ export class ILMC {
     this.floor.visible = room && !this.coaster?.riding;
     this.strobeLight.intensity = this.strobe * 4 * fx.alive * (this.reduce ? 0.2 : 1) * ((1 - sky) + E.bliss * (0.4 * set + 0.9 * night));   // on the hill it shows as the light goes
     this.scene.environmentIntensity = 0.12 + E.y2k * 0.9 + dayK * (0.45 - 0.25 * set) + E.void * 1.2;
-    this.world.update(this.t, E, { day: this.day, scene: this.skyScene, flyD: this.flyD, flash: this.flash * 0.5 + 0.12 * (this.beatEnv || 0) * E.y2k * (this.reduce ? 0.3 : 1), hue: wash });
+    this.world.update(this.t, E, { day: this.day, scene: this.skyScene, flyD: this.flyD, flash: this.flash * 0.5 * calm + 0.12 * (this.beatEnv || 0) * E.y2k * (this.reduce ? 0.3 : 1), hue: wash });
   }
 
   winRect() {
